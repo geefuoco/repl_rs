@@ -1,5 +1,5 @@
 [package]
-name = "sql_clean"
+name = "repl_rs"
 version = "0.1.0"
 edition = "2021"
 
