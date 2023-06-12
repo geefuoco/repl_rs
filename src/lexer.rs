@@ -1,8 +1,10 @@
+use std::fmt::Display;
+
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token<'a> {
-    IDENT(&'a str),
-    INTEGER(&'a str),
-    STRING(&'a str),
+pub enum Token {
+    IDENT(String),
+    INTEGER(String),
+    STRING(String),
     FUNCTION,
     LET,
     LPAREN,
@@ -36,6 +38,54 @@ pub enum Token<'a> {
     ILLEGAL
 }
 
+impl Token {
+    pub fn literal(&self) -> &str{
+        match self {
+            Token::IDENT(v) =>v,
+            Token::INTEGER(v) =>v,
+            Token::STRING(v) =>v,
+            Token::FUNCTION =>"fn".into(),
+            Token::LET =>"let".into(),
+            Token::LPAREN =>"(".into(),
+            Token::RPAREN =>")".into(),
+            Token::LBRACE =>"{".into(),
+            Token::RBRACE =>"}".into(),
+            Token::LSQUARE =>"[".into(),
+            Token::RSQUARE =>"]".into(),
+            Token::COMMA =>",".into(),
+            Token::SEMICOLON =>";".into(),
+            Token::ASSIGN =>"=".into(),
+            Token::PLUS =>"+".into(),
+            Token::MINUS =>"-".into(),
+            Token::LT =>"<".into(),
+            Token::GT =>">".into(),
+            Token::EQUAL =>"==".into(),
+            Token::AND =>"&".into(),
+            Token::OR =>"|".into(),
+            Token::NOT_EQUAL =>"!=".into(),
+            Token::IF =>"if".into(),
+            Token::ELSE =>"else".into(),
+            Token::RETURN =>"return".into(),
+            Token::TRUE =>"true".into(),
+            Token::FALSE =>"false".into(),
+            Token::DIVIDE =>"/".into(),
+            Token::MULTIPLY =>"*".into(),
+            Token::BANG =>"!".into(),
+            Token::SINGLE_QUOTE =>"'".into(),
+            Token::DOUBLE_QUOTE =>"\"".into(),
+            Token::EOF =>"EOF".into(),
+            Token::ILLEGAL =>"ILLEGAL".into(),
+        }
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)?;
+        write!(f, ": {}", self.literal())
+    }
+}
+
 #[derive(Debug)]
 pub struct Lexer {
     read_position: usize,
@@ -43,8 +93,9 @@ pub struct Lexer {
     input: Vec<u8>,
     ch: u8,
     parsing_string: bool,
-    prev_token_string: bool
+    prev_token_string: bool,
 }
+
 
 impl Lexer {
     pub fn new(input: String) -> Self {
@@ -54,7 +105,7 @@ impl Lexer {
             input: input.into_bytes(),
             ch: 0,
             parsing_string: false,
-            prev_token_string: false
+            prev_token_string: false,
         };
         l.read_char();
         l
@@ -64,7 +115,7 @@ impl Lexer {
         self.skip_whitespace();
         if self.parsing_string {
             let value = self.read_str();
-            return Token::STRING(value);
+            return Token::STRING(value.into());
         }
         let tok = match self.ch {
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
@@ -77,13 +128,13 @@ impl Lexer {
                     "return" => Token::RETURN,
                     "true" => Token::TRUE,
                     "false" => Token::FALSE,
-                    _ => Token::IDENT(ident)
+                    _ => Token::IDENT(ident.into())
                 };
                 return tok;
             },
             b'0'..=b'9' => {
                 let ident = self.read_int();
-                let tok = Token::INTEGER(ident);
+                let tok = Token::INTEGER(ident.into());
                 return tok;
             },
             b'(' => Token::LPAREN,
@@ -238,58 +289,58 @@ mod tests {
 
         let tokens = vec![
             Token::LET,
-            Token::IDENT("five"),
+            Token::IDENT("five".into()),
             Token::ASSIGN,
-            Token::INTEGER("5"),
+            Token::INTEGER("5".into()),
             Token::SEMICOLON,
 
             Token::LET,
-            Token::IDENT("ten"),
+            Token::IDENT("ten".into()),
             Token::ASSIGN,
-            Token::INTEGER("10"),
+            Token::INTEGER("10".into()),
             Token::SEMICOLON,
 
             Token::LET,
-            Token::IDENT("add"),
+            Token::IDENT("add".into()),
             Token::ASSIGN,
             Token::FUNCTION,
             Token::LPAREN,
-            Token::IDENT("x"),
+            Token::IDENT("x".into()),
             Token::COMMA,
-            Token::IDENT("y"),
+            Token::IDENT("y".into()),
             Token::RPAREN,
             Token::LBRACE,
-            Token::IDENT("x"),
+            Token::IDENT("x".into()),
             Token::PLUS,
-            Token::IDENT("y"),
+            Token::IDENT("y".into()),
             Token::SEMICOLON,
             Token::RBRACE,
             Token::SEMICOLON,
 
             Token::LET,
-            Token::IDENT("string"),
+            Token::IDENT("string".into()),
             Token::ASSIGN,
             Token::DOUBLE_QUOTE,
-            Token::STRING("hello"),
+            Token::STRING("hello".into()),
             Token::DOUBLE_QUOTE,
             Token::SEMICOLON,
 
             Token::LET,
-            Token::IDENT("ch"),
+            Token::IDENT("ch".into()),
             Token::ASSIGN,
             Token::SINGLE_QUOTE,
-            Token::IDENT("a"),
+            Token::IDENT("a".into()),
             Token::SINGLE_QUOTE,
             Token::SEMICOLON,
 
             Token::LET,
-            Token::IDENT("result"),
+            Token::IDENT("result".into()),
             Token::ASSIGN,
-            Token::IDENT("add"),
+            Token::IDENT("add".into()),
             Token::LPAREN,
-            Token::IDENT("five"),
+            Token::IDENT("five".into()),
             Token::COMMA,
-            Token::IDENT("ten"),
+            Token::IDENT("ten".into()),
             Token::RPAREN,
             Token::SEMICOLON,
             Token::EOF,
@@ -322,21 +373,21 @@ mod tests {
             Token::MINUS,
             Token::DIVIDE,
             Token::MULTIPLY,
-            Token::INTEGER("5"),
+            Token::INTEGER("5".into()),
             Token::SEMICOLON,
 
-            Token::INTEGER("5"),
+            Token::INTEGER("5".into()),
             Token::LT,
-            Token::INTEGER("10"),
+            Token::INTEGER("10".into()),
             Token::GT,
-            Token::INTEGER("5"),
+            Token::INTEGER("5".into()),
             Token::SEMICOLON,
 
             Token::IF,
             Token::LPAREN,
-            Token::INTEGER("5"),
+            Token::INTEGER("5".into()),
             Token::LT,
-            Token::INTEGER("10"),
+            Token::INTEGER("10".into()),
             Token::RPAREN,
             Token::LBRACE,
             Token::RETURN,
@@ -350,14 +401,14 @@ mod tests {
             Token::SEMICOLON,
             Token::RBRACE,
 
-            Token::INTEGER("10"),
+            Token::INTEGER("10".into()),
             Token::EQUAL,
-            Token::INTEGER("10"),
+            Token::INTEGER("10".into()),
             Token::SEMICOLON,
             
-            Token::INTEGER("10"),
+            Token::INTEGER("10".into()),
             Token::NOT_EQUAL,
-            Token::INTEGER("9"),
+            Token::INTEGER("9".into()),
             Token::SEMICOLON,
             Token::EOF,
         ];
@@ -379,26 +430,26 @@ mod tests {
 
         let tokens = vec![
             Token::LET,
-            Token::IDENT("x"),
+            Token::IDENT("x".into()),
             Token::ASSIGN,
             Token::DOUBLE_QUOTE,
-            Token::STRING("hello"),
+            Token::STRING("hello".into()),
             Token::DOUBLE_QUOTE,
             Token::SEMICOLON,
 
             Token::LET,
-            Token::IDENT("y"),
+            Token::IDENT("y".into()),
             Token::ASSIGN,
             Token::DOUBLE_QUOTE,
-            Token::STRING("world!"),
+            Token::STRING("world!".into()),
             Token::DOUBLE_QUOTE,
             Token::SEMICOLON,
 
             Token::LET,
-            Token::IDENT("test"),
+            Token::IDENT("test".into()),
             Token::ASSIGN,
             Token::DOUBLE_QUOTE,
-            Token::STRING("'abc123_!@#$%^&*(){};"),
+            Token::STRING("'abc123_!@#$%^&*(){};".into()),
             Token::DOUBLE_QUOTE,
             Token::SEMICOLON,
         ];
