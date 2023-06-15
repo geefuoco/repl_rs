@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Node,  Token};
+use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
 use super::AsAny;

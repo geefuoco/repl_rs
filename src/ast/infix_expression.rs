@@ -1,5 +1,5 @@
 use crate::ast::{Expression, Node, Token};
-use std::fmt::Display;
+use std::{borrow::Borrow, fmt::Display};
 
 use super::AsAny;
 
@@ -63,7 +63,7 @@ impl Display for InfixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "({}{}{})",
+            "({} {} {})",
             self.expression_left, self.operator, self.expression_right
         )?;
         Ok(())

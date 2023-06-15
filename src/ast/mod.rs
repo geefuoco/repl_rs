@@ -2,15 +2,29 @@ use crate::lexer::Token;
 use std::any::Any;
 use std::fmt::{Debug, Display};
 
+pub mod block_statement;
+pub mod boolean_literal;
 pub mod expression_statement;
 pub mod identifier;
+pub mod if_expression;
+pub mod infix_expression;
 pub mod integer_literal;
 pub mod let_statement;
-pub mod return_statement;
 pub mod prefix_expression;
-pub mod infix_expression;
+pub mod return_statement;
 
-pub trait AsAny {
+pub use expression_statement::ExpressionStatement;
+pub use identifier::Identifier;
+pub use if_expression::IfExpression;
+pub use infix_expression::InfixExpression;
+pub use integer_literal::IntegerLiteral;
+pub use let_statement::LetStatement;
+pub use prefix_expression::PrefixExpression;
+pub use return_statement::ReturnStatement;
+pub use block_statement::BlockStatement;
+pub use boolean_literal::BooleanLiteral;
+
+pub trait AsAny: Any {
     fn as_any(&self) -> &dyn Any;
 }
 
@@ -24,7 +38,7 @@ pub trait Statement: Node + AsAny {
 
 impl Debug for dyn Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Statement{{{}}}", self.token_literal())
+        write!(f, "Statement {{ {} }}", self.token_literal())
     }
 }
 
@@ -58,6 +72,14 @@ impl Node for Program {
             return self.statements[0].token_literal();
         }
         ""
+    }
+}
+
+pub struct OptionalBlockStatement<T>(Option<T>);
+
+impl<T> OptionalBlockStatement<T> {
+    pub fn new(option: Option<T>) -> Self {
+        Self(option)
     }
 }
 
