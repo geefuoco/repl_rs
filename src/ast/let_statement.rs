@@ -4,9 +4,9 @@ use std::fmt::Display;
 use super::AsAny;
 
 pub struct LetStatement {
-    pub token: Token,
-    pub name: Identifier,
-    pub value: Box<dyn Expression>,
+    token: Token,
+    name: Identifier,
+    value: Box<dyn Expression>,
 }
 
 impl LetStatement {
@@ -19,6 +19,10 @@ impl LetStatement {
 
     pub fn name(&self) -> &Identifier {
         &self.name
+    }
+
+    pub fn value(&self) -> &Box<dyn Expression> {
+        &self.value
     }
 }
 

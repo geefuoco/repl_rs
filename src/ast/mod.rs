@@ -95,14 +95,15 @@ mod tests {
     #[test]
     fn test_string() {
         let mut v: Vec<Box<dyn Statement>> = Vec::new();
-        v.push(Box::new(let_statement::LetStatement {
-            token: Token::Let,
-            name: identifier::Identifier::new(Token::Ident("my_var".into()), "my_var".into()),
-            value: Box::new(identifier::Identifier::new(
+        v.push(Box::new(let_statement::LetStatement::new(
+            Token::Let,
+            identifier::Identifier::new(Token::Ident("my_var".into()), "my_var".into()),
+            Box::new(identifier::Identifier::new(
                 Token::Ident("another_var".into()),
                 "another_var".into(),
-            )),
-        }));
+            ))
+        ) 
+        ));
 
         let mut test_str = String::new();
         let program = Program { statements: v };

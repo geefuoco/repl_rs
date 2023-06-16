@@ -6,6 +6,7 @@ use crate::ast::FunctionLiteral;
 use crate::ast::IfExpression;
 use crate::ast::InfixExpression;
 use crate::ast::IntegerLiteral;
+use crate::ast::LetStatement;
 use crate::ast::OptionalBlockStatement;
 use crate::ast::PrefixExpression;
 use crate::ast::ReturnStatement;
@@ -170,54 +171,34 @@ impl Parser {
         }
         let return_token = return_token.unwrap();
         self.next_token();
-        let break_token = discriminant(&Token::Semicolon);
-        while let Some(tok) = &self.curr_token {
-            if discriminant::<Token>(&tok) == break_token {
-                break;
-            } else {
-                self.next_token();
-            }
+        let return_value = self.parse_expression(Priority::Lowest).expect("could not parse expression in return statement");
+        if self.peek_token == Some(Token::Semicolon){
+            self.next_token();
         }
-        // Some(Box::new(ReturnStatement::new(return_token, expression)))
-        todo!()
+        Some(Box::new(ReturnStatement::new(return_token, return_value)))
     }
 
     fn parse_let_statement(&mut self) -> Option<Box<dyn Statement>> {
-        let let_token = self.curr_token.take();
-        if let_token.is_none() {
+        let let_token = self.curr_token.clone().expect("no current token found");
+        if !self.expect_peek(Token::Ident("".into())) {
             return None;
         }
-        let let_token = let_token.as_ref().unwrap();
-
-        let exp_token = Token::Ident("".into());
-        if !&self.expect_peek(exp_token) {
-            return None;
-        }
-        let ident_token = self.curr_token.take();
-        if ident_token.is_none() {
-            return None;
-        }
-        let ident_token = ident_token.unwrap();
+        let ident_token = self.curr_token.clone().expect("no current token found");
         let ident_literal = match &ident_token {
             Token::Ident(value) => value.clone(),
             _ => unreachable!(),
         };
         let ident = Identifier::new(ident_token, ident_literal);
 
-        let exp_token = Token::Assign;
-        if !&self.expect_peek(exp_token) {
+        if !self.expect_peek(Token::Assign) {
             return None;
         }
-        let break_token = discriminant(&Token::Semicolon);
-        while let Some(tok) = &self.curr_token {
-            if discriminant::<Token>(&tok) == break_token {
-                break;
-            } else {
-                self.next_token();
-            }
+        self.next_token();
+        let value = self.parse_expression(Priority::Lowest).expect("Could not parse expression in let statement");
+        if self.peek_token == Some(Token::Semicolon) {
+            self.next_token();
         }
-        // Some(Box::new(LetStatement::new(let_token, ident)))
-        todo!()
+        Some(Box::new(LetStatement::new(let_token, ident, value)))
     }
 
     fn expect_peek(&mut self, token_type: Token) -> bool {
@@ -607,6 +588,35 @@ mod tests {
         assert_eq!(expression.operator(), op);
     }
 
+    fn test_return_statement(return_statement: &ReturnStatement, identifier: Types, value: Types) {
+        match identifier {
+            Types::String(v) => assert_eq!(return_statement.token_literal(), v),
+            _ =>{
+                unreachable!()
+            }
+        }
+        match value {
+            Types::String(x) => test_literal(return_statement.return_value(), Types::String(x)),
+            Types::Isize(x) => test_literal(return_statement.return_value(), Types::Isize(x)),
+            Types::Bool(x) => test_literal(return_statement.return_value(), Types::Bool(x)),
+        }
+        
+    }
+    fn test_let_statement(let_statement: &LetStatement, identifier: Types, value: Types) {
+        match identifier {
+            Types::String(v) => test_ident(let_statement.name(), v),
+            _ =>{
+                unreachable!()
+            }
+        }
+        match value {
+            Types::String(x) => test_literal(let_statement.value(), Types::String(x)),
+            Types::Isize(x) => test_literal(let_statement.value(), Types::Isize(x)),
+            Types::Bool(x) => test_literal(let_statement.value(), Types::Bool(x)),
+        }
+        
+    }
+
     #[test]
     fn test_new_helper() {
         let exp = &InfixExpression::new(
@@ -633,28 +643,48 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    fn test_let_statement() {
-        let input = r#"
-        let x = 5;
-        let y = 10;
-        let foobar = 838383;
-        "#;
+    fn test_let_statements() {
+        let inputs = [
+            ("let x = 5;", Types::String("x"), Types::Isize(5)),
+            ("let y = true;", Types::String("y"), Types::Bool(true)),
+            (
+                "let foobar = y;",
+                Types::String("foobar"),
+                Types::String("y"),
+            ),
+        ];
 
-        let program = test_helper(input);
-        assert_eq!(program.statements.len(), 3);
+        for (input, left, right) in inputs {
+            let program = test_helper(input);
+            let statement = program.statements.get(0).unwrap();
+            let let_statement = statement
+                .as_any()
+                .downcast_ref::<LetStatement>()
+                .expect("statement was not LetStatement");
+            test_let_statement(&let_statement, left, right)
+        }
+    }
 
-        let expexted_identifiers = vec!["x", "y", "foobar"];
+    #[test]
+    fn test_return_statements() {
+        let inputs = [
+            ("return 5;", Types::String("return"), Types::Isize(5)),
+            ("return true;", Types::String("return"), Types::Bool(true)),
+            (
+                "return foobar;",
+                Types::String("return"),
+                Types::String("foobar"),
+            ),
+        ];
 
-        for (i, ident) in expexted_identifiers.iter().enumerate() {
-            let stmt = &program.statements[i];
-            assert_eq!(stmt.token_literal(), "let");
-            let stmt: &LetStatement = match stmt.as_any().downcast_ref::<LetStatement>() {
-                Some(b) => b,
-                None => panic!("Could not cast statement to let statement"),
-            };
-            assert_eq!(stmt.name().value(), *ident);
-            assert_eq!(stmt.name().token_literal(), *ident);
+        for (input, left, right) in inputs {
+            let program = test_helper(input);
+            let statement = program.statements.get(0).unwrap();
+            let let_statement = statement
+                .as_any()
+                .downcast_ref::<ReturnStatement>()
+                .expect("statement was not ReturnStatement");
+            test_return_statement(&let_statement, left, right)
         }
     }
 
@@ -668,22 +698,6 @@ mod tests {
         "#;
 
         let _ = test_helper(input);
-    }
-
-    #[test]
-    #[ignore]
-    fn test_return_statement() {
-        let input = r#"
-        return 5;
-        return 10;
-        return 993322;
-        "#;
-        let program = test_helper(input);
-        assert_eq!(program.statements.len(), 3);
-
-        for stmt in program.statements {
-            assert_eq!(stmt.token_literal(), "return");
-        }
     }
 
     #[test]

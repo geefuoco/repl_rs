@@ -15,6 +15,14 @@ impl ReturnStatement {
             return_value,
         }
     }
+
+    pub fn token(&self) -> &Token {
+        &self.token
+    }
+
+    pub fn return_value(&self) -> &Box<dyn Expression> {
+        &self.return_value
+    }
 }
 
 impl Display for ReturnStatement {
