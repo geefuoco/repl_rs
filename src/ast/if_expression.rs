@@ -1,7 +1,6 @@
-use super::{AsAny, Statement, OptionalBlockStatement};
+use super::{AsAny, OptionalBlockStatement, Statement};
 use crate::ast::{block_statement::BlockStatement, Expression, Node, Token};
 use std::fmt::Display;
-
 
 pub struct IfExpression {
     token: Token,
@@ -29,7 +28,7 @@ impl IfExpression {
         &self.token
     }
 
-    pub fn consequence(&self) -> &BlockStatement{
+    pub fn consequence(&self) -> &BlockStatement {
         &self.consequence
     }
 
@@ -45,7 +44,7 @@ impl IfExpression {
 impl<T: Display> Display for OptionalBlockStatement<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.0.is_some() {
-            write!(f, "else {}", &self.0.as_ref().unwrap())?;
+            write!(f, "{}", &self.0.as_ref().unwrap())?;
         }
         Ok(())
     }
@@ -53,9 +52,9 @@ impl<T: Display> Display for OptionalBlockStatement<T> {
 
 impl Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "if {} {}", self.condition, self.consequence)?;
+        write!(f, "if {} {{ {} }}", self.condition, self.consequence)?;
         if self.alternative.0.is_some() {
-            write!(f, "else {}", self.alternative)?;
+            write!(f, " else {{ {} }}", self.alternative)?;
         }
         Ok(())
     }

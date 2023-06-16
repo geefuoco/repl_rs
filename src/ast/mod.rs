@@ -5,6 +5,7 @@ use std::fmt::{Debug, Display};
 pub mod block_statement;
 pub mod boolean_literal;
 pub mod expression_statement;
+pub mod function_literal;
 pub mod identifier;
 pub mod if_expression;
 pub mod infix_expression;
@@ -13,7 +14,10 @@ pub mod let_statement;
 pub mod prefix_expression;
 pub mod return_statement;
 
+pub use block_statement::BlockStatement;
+pub use boolean_literal::BooleanLiteral;
 pub use expression_statement::ExpressionStatement;
+pub use function_literal::FunctionLiteral;
 pub use identifier::Identifier;
 pub use if_expression::IfExpression;
 pub use infix_expression::InfixExpression;
@@ -21,8 +25,6 @@ pub use integer_literal::IntegerLiteral;
 pub use let_statement::LetStatement;
 pub use prefix_expression::PrefixExpression;
 pub use return_statement::ReturnStatement;
-pub use block_statement::BlockStatement;
-pub use boolean_literal::BooleanLiteral;
 
 pub trait AsAny: Any {
     fn as_any(&self) -> &dyn Any;

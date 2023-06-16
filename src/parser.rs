@@ -1,6 +1,7 @@
 use crate::ast::BlockStatement;
 use crate::ast::BooleanLiteral;
 use crate::ast::ExpressionStatement;
+use crate::ast::FunctionLiteral;
 use crate::ast::IfExpression;
 use crate::ast::InfixExpression;
 use crate::ast::IntegerLiteral;
@@ -146,6 +147,7 @@ impl Parser {
         self.register_prefix(Token::False.token_type(), Parser::parse_boolean);
         self.register_prefix(Token::Lparen.token_type(), Parser::parse_grouped_expression);
         self.register_prefix(Token::If.token_type(), Parser::parse_if_expression);
+        self.register_prefix(Token::Function.token_type(), Parser::parse_function_literal);
     }
 
     fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
@@ -307,11 +309,19 @@ impl Parser {
                     panic!("Missing Left Brace");
                 }
                 let consequence = self.parse_block_statement();
+                let mut alternative = OptionalBlockStatement::new(None);
+                if self.peek_token == Some(Token::Else) {
+                    self.next_token();
+                    if !self.expect_peek(Token::Lbrace) {
+                        panic!("Missing Left Brace");
+                    }
+                    alternative = OptionalBlockStatement::new(Some(self.parse_block_statement()));
+                }
                 Box::new(IfExpression::new(
                     curr_token,
                     condition,
                     consequence,
-                    OptionalBlockStatement::new(None),
+                    alternative,
                 ))
             }
             false => panic!("Missing Left Parenthesis"),
@@ -410,6 +420,50 @@ impl Parser {
             expression_right,
         ))
     }
+
+    fn parse_function_literal(&mut self) -> Box<dyn Expression> {
+        let tok = self
+            .curr_token
+            .as_ref()
+            .expect("should exist at this point")
+            .clone();
+        if !self.expect_peek(Token::Lparen) {
+            panic!("Missing Left Parenthesis");
+        }
+        let parameters = self.parse_function_parameters();
+        if !self.expect_peek(Token::Lbrace) {
+            panic!("Missing Left Brace");
+        }
+        let body = self.parse_block_statement();
+        Box::new(FunctionLiteral::new(tok, parameters, body))
+    }
+
+    fn parse_function_parameters(&mut self) -> Vec<Identifier> {
+        let mut v = Vec::new();
+        if self.peek_token == Some(Token::Rparen) {
+            self.next_token();
+            return v;
+        }
+        self.next_token();
+        let tok = self.curr_token.as_ref().expect("should be present");
+        let literal = tok.literal();
+        let ident = Identifier::new(tok.clone(), literal.to_string());
+        v.push(ident);
+
+        while self.peek_token == Some(Token::Comma) {
+            self.next_token();
+            self.next_token();
+            let tok = self.curr_token.as_ref().expect("should be present");
+            let literal = tok.literal();
+            let ident = Identifier::new(tok.clone(), literal.to_string());
+            v.push(ident);
+        }
+
+        if !self.expect_peek(Token::Rparen) {
+            panic!("Missing Right parenthesis");
+        }
+        v
+    }
 }
 
 #[cfg(test)]
@@ -423,7 +477,7 @@ mod tests {
     use crate::ast::integer_literal::IntegerLiteral;
     use crate::ast::let_statement::LetStatement;
     use crate::ast::prefix_expression::PrefixExpression;
-    use crate::ast::Node;
+    use crate::ast::{FunctionLiteral, Node};
 
     enum Types<'a> {
         String(&'a str),
@@ -495,7 +549,6 @@ mod tests {
             }
         }
     }
-
 
     fn test_infix_expression(expression: &InfixExpression, left: Types, op: &str, right: Types) {
         match left {
@@ -611,7 +664,7 @@ mod tests {
             Some(v) => v,
             None => panic!("Statement was not an identifier"),
         };
-        test_ident(ident, &input[..input.len()-1]);
+        test_ident(ident, &input[..input.len() - 1]);
     }
 
     #[test]
@@ -885,7 +938,15 @@ mod tests {
         let input = "if (x < y) { x } else { y }";
         let program = test_helper(input);
         let statement = program.statements.get(0).expect("Could not find statement");
-        let if_expression = match statement.as_any().downcast_ref::<IfExpression>() {
+        let statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
+            Some(v) => v,
+            None => panic!("Could not convert into ExpressionStatement"),
+        };
+        let if_expression = match statement
+            .expression()
+            .as_any()
+            .downcast_ref::<IfExpression>()
+        {
             Some(v) => v,
             None => panic!("Could not convert into IfExpression"),
         };
@@ -938,5 +999,75 @@ mod tests {
             .downcast_ref::<Identifier>()
             .expect("Could not convert into Identifier");
         test_ident(alternative, "y");
+    }
+
+    #[test]
+    fn test_fn_literal() {
+        let input = "fn(x, y) { x + y }";
+        let program = test_helper(input);
+        let statement = program.statements.get(0).unwrap();
+        let exp_statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
+            Some(v) => v,
+            None => panic!("statement was not an ExpressionStatement"),
+        };
+        let fn_literal = match exp_statement
+            .expression()
+            .as_any()
+            .downcast_ref::<FunctionLiteral>()
+        {
+            Some(v) => v,
+            None => panic!("expression was not a FunctionLiteral"),
+        };
+        assert_eq!(fn_literal.parameters().len(), 2);
+        test_ident(fn_literal.parameters().get(0).unwrap(), "x");
+        test_ident(fn_literal.parameters().get(1).unwrap(), "y");
+        assert_eq!(fn_literal.body().statements().len(), 1);
+        let infix = match fn_literal
+            .body()
+            .statements()
+            .get(0)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Should be an expression statement i hope")
+            .expression()
+            .as_any()
+            .downcast_ref::<InfixExpression>()
+        {
+            Some(v) => v,
+            None => panic!("fn_literal body statement was not an InfixExpression"),
+        };
+        test_infix_expression(infix, Types::String("x"), "+", Types::String("y"));
+    }
+
+    #[test]
+    fn test_function_parameter_parsing() {
+        let inputs = [
+            ("fn() {};", vec![]),
+            ("fn(x) {};", vec!["x"]),
+            ("fn(x, y, z) {};", vec!["x", "y", "z"]),
+        ];
+
+        for (input, expected) in inputs {
+            let program = test_helper(input);
+            let statement = program.statements.get(0).unwrap();
+            let exp_statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                Some(v) => v,
+                None => panic!("statement was not an ExpressionStatement"),
+            };
+            let fn_literal = match exp_statement
+                .expression()
+                .as_any()
+                .downcast_ref::<FunctionLiteral>()
+            {
+                Some(v) => v,
+                None => panic!("ExpressionStatement was not FunctionLiteral"),
+            };
+
+            assert_eq!(expected.len(), fn_literal.parameters().len());
+            for (i, ident) in fn_literal.parameters().iter().enumerate() {
+                test_ident(ident, expected.get(i).unwrap());
+            }
+        }
     }
 }
