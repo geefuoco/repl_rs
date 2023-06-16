@@ -5,7 +5,7 @@ use std::fmt::Display;
 pub struct FunctionLiteral {
     token: Token,
     parameters: Vec<Identifier>,
-    body: BlockStatement
+    body: BlockStatement,
 }
 
 impl FunctionLiteral {
@@ -13,7 +13,7 @@ impl FunctionLiteral {
         Self {
             token,
             parameters,
-            body
+            body,
         }
     }
     pub fn token(&self) -> &Token {
@@ -49,9 +49,13 @@ impl AsAny for FunctionLiteral {
 
 impl Display for FunctionLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} (", self.token_literal())?;
-        for param in &self.parameters {
-            write!(f, "{}, ", param)?;
+        write!(f, "{}(", self.token_literal())?;
+        let n = self.parameters().len();
+        for (i, param) in self.parameters.iter().enumerate() {
+            write!(f, "{}", param)?;
+            if i < n - 1 {
+                write!(f, ", ")?;
+            }
         }
         write!(f, ") {{ {} ", self.body)?;
         write!(f, "}}")

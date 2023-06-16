@@ -11,7 +11,7 @@ use crate::ast::OptionalBlockStatement;
 use crate::ast::PrefixExpression;
 use crate::ast::ReturnStatement;
 use crate::{
-    ast::{AsAny, Expression, Identifier, Program, Statement},
+    ast::{Expression, Identifier, Program, Statement},
     lexer::{Lexer, Token},
 };
 use std::collections::HashMap;
@@ -29,8 +29,9 @@ enum Priority {
     Call,
 }
 
-type PrefixParseFn = fn(p: &mut Parser) -> Box<dyn Expression>;
-type InfixParseFn = fn(p: &mut Parser, expresion: Box<dyn Expression>) -> Box<dyn Expression>;
+type PrefixParseFn = fn(p: &mut Parser) -> Option<Box<dyn Expression>>;
+type InfixParseFn =
+    fn(p: &mut Parser, expresion: Box<dyn Expression>) -> Option<Box<dyn Expression>>;
 
 pub struct Parser {
     lexer: Lexer,
@@ -86,6 +87,8 @@ impl Parser {
                     let statement = self.parse_statement();
                     if let Some(statement) = statement {
                         program.statements.push(statement);
+                    } else {
+                        println!("{}", self.errors().get(0).unwrap());
                     }
                     self.next_token();
                 }
@@ -171,8 +174,10 @@ impl Parser {
         }
         let return_token = return_token.unwrap();
         self.next_token();
-        let return_value = self.parse_expression(Priority::Lowest).expect("could not parse expression in return statement");
-        if self.peek_token == Some(Token::Semicolon){
+        let return_value = self
+            .parse_expression(Priority::Lowest)
+            .expect("could not parse expression in return statement");
+        if self.peek_token == Some(Token::Semicolon) {
             self.next_token();
         }
         Some(Box::new(ReturnStatement::new(return_token, return_value)))
@@ -194,7 +199,9 @@ impl Parser {
             return None;
         }
         self.next_token();
-        let value = self.parse_expression(Priority::Lowest).expect("Could not parse expression in let statement");
+        let value = self
+            .parse_expression(Priority::Lowest)
+            .expect("Could not parse expression in let statement");
         if self.peek_token == Some(Token::Semicolon) {
             self.next_token();
         }
@@ -261,7 +268,7 @@ impl Parser {
 
         while self.peek_token != Some(Token::Semicolon) && precedence < self.peek_precedence() {
             if self.peek_token.is_none() {
-                return Some(left_exp);
+                return left_exp;
             }
             let peek_token_type = self.peek_token.as_mut().unwrap().token_type();
             let infix_func = self
@@ -270,12 +277,12 @@ impl Parser {
                 .expect(format!("Could not find function with key: {}", peek_token_type).as_str())
                 .clone();
             self.next_token();
-            left_exp = infix_func(self, left_exp);
+            left_exp = infix_func(self, left_exp?);
         }
-        Some(left_exp)
+        left_exp
     }
 
-    fn parse_if_expression(&mut self) -> Box<dyn Expression> {
+    fn parse_if_expression(&mut self) -> Option<Box<dyn Expression>> {
         match self.expect_peek(Token::Lparen) {
             true => {
                 let curr_token = self
@@ -287,37 +294,34 @@ impl Parser {
                     .parse_expression(Priority::Lowest)
                     .expect("Could not parse expression");
                 if !self.expect_peek(Token::Rparen) {
-                    panic!("Missing Right Parenthesis");
+                    return None;
                 }
                 if !self.expect_peek(Token::Lbrace) {
-                    panic!("Missing Left Brace");
+                    return None;
                 }
-                let consequence = self.parse_block_statement();
+                let consequence = self.parse_block_statement()?;
                 let mut alternative = OptionalBlockStatement::new(None);
                 if self.peek_token == Some(Token::Else) {
                     self.next_token();
                     if !self.expect_peek(Token::Lbrace) {
-                        panic!("Missing Left Brace");
+                        return None;
                     }
-                    alternative = OptionalBlockStatement::new(Some(self.parse_block_statement()));
+                    alternative = OptionalBlockStatement::new(Some(self.parse_block_statement()?));
                 }
-                Box::new(IfExpression::new(
+                Some(Box::new(IfExpression::new(
                     curr_token,
                     condition,
                     consequence,
                     alternative,
-                ))
+                )))
             }
-            false => panic!("Missing Left Parenthesis"),
+            false => None,
         }
     }
 
-    fn parse_block_statement(&mut self) -> BlockStatement {
+    fn parse_block_statement(&mut self) -> Option<BlockStatement> {
         let mut v = Vec::new();
-        let curr_token = self
-            .curr_token
-            .clone()
-            .expect("Could not find current token");
+        let curr_token = self.curr_token.clone()?;
         self.next_token();
         while self.curr_token != Some(Token::Rbrace) && self.curr_token != Some(Token::Eof) {
             let stmt = self.parse_statement();
@@ -327,106 +331,87 @@ impl Parser {
             }
             self.next_token();
         }
-        BlockStatement::new(curr_token, v)
+        Some(BlockStatement::new(curr_token, v))
     }
 
-    fn parse_grouped_expression(&mut self) -> Box<dyn Expression> {
+    fn parse_grouped_expression(&mut self) -> Option<Box<dyn Expression>> {
         self.next_token();
-        let exp = self.parse_expression(Priority::Lowest);
+        let exp = self.parse_expression(Priority::Lowest)?;
         match self.expect_peek(Token::Rparen) {
-            true => exp.expect("Missing Right Parenthesis"),
-            false => panic!("Missing Right Parenthesis"),
+            true => Some(exp),
+            false => None,
         }
     }
 
-    fn parse_identifier(&mut self) -> Box<dyn Expression> {
-        let tok = self
-            .curr_token
-            .as_ref()
-            .expect("should exist at this point");
+    fn parse_identifier(&mut self) -> Option<Box<dyn Expression>> {
+        let tok = self.curr_token.as_ref()?;
         let literal = tok.literal();
-        Box::new(Identifier::new(tok.clone(), literal.into()))
+        Some(Box::new(Identifier::new(tok.clone(), literal.into())))
     }
 
-    fn parse_integer_literal(&mut self) -> Box<dyn Expression> {
-        let tok = self
-            .curr_token
-            .as_ref()
-            .expect("should exist at this point");
+    fn parse_integer_literal(&mut self) -> Option<Box<dyn Expression>> {
+        let tok = self.curr_token.as_ref()?;
         let literal = tok
             .literal()
             .parse::<isize>()
             .expect("Type was not a number");
-        Box::new(IntegerLiteral::new(tok.clone(), literal))
+        Some(Box::new(IntegerLiteral::new(tok.clone(), literal)))
     }
 
-    fn parse_boolean(&mut self) -> Box<dyn Expression> {
-        let tok = self
-            .curr_token
-            .as_ref()
-            .expect("should exist at this point");
-        let literal = tok.literal().parse::<bool>().expect("Type was not a bool");
-        Box::new(BooleanLiteral::new(tok.clone(), literal))
+    fn parse_boolean(&mut self) -> Option<Box<dyn Expression>> {
+        let tok = self.curr_token.as_ref()?;
+        let literal = tok.literal().parse::<bool>().expect("type was not a bool");
+        Some(Box::new(BooleanLiteral::new(tok.clone(), literal)))
     }
-    fn parse_prefix_expression(&mut self) -> Box<dyn Expression> {
-        let tok = self
-            .curr_token
-            .as_ref()
-            .expect("should exist at this point")
-            .clone();
+    fn parse_prefix_expression(&mut self) -> Option<Box<dyn Expression>> {
+        let tok = self.curr_token.as_ref()?.clone();
         let literal = String::from(tok.literal());
         self.next_token();
         let expression_right = self
             .parse_expression(Priority::Prefix)
             .expect("Failed to parse right side of prefix expression");
-        Box::new(PrefixExpression::new(tok, literal, expression_right))
+        Some(Box::new(PrefixExpression::new(
+            tok,
+            literal,
+            expression_right,
+        )))
     }
 
     fn parse_infix_expression(
         &mut self,
         expression_left: Box<dyn Expression>,
-    ) -> Box<dyn Expression> {
-        let tok = self
-            .curr_token
-            .as_ref()
-            .expect("should exist at this point")
-            .clone();
+    ) -> Option<Box<dyn Expression>> {
+        let tok = self.curr_token.as_ref()?.clone();
         let operator = String::from(tok.literal());
         let precedence = self.curr_precedence();
         self.next_token();
-        let expression_right = self
-            .parse_expression(precedence)
-            .expect("Failed to parse right side of infix expression");
-        Box::new(InfixExpression::new(
+        let expression_right = self.parse_expression(precedence)?;
+        Some(Box::new(InfixExpression::new(
             tok,
             operator,
             expression_left,
             expression_right,
-        ))
+        )))
     }
 
-    fn parse_function_literal(&mut self) -> Box<dyn Expression> {
-        let tok = self
-            .curr_token
-            .as_ref()
-            .expect("should exist at this point")
-            .clone();
+    fn parse_function_literal(&mut self) -> Option<Box<dyn Expression>> {
+        let tok = self.curr_token.as_ref()?.clone();
         if !self.expect_peek(Token::Lparen) {
-            panic!("Missing Left Parenthesis");
+            return None;
         }
-        let parameters = self.parse_function_parameters();
+        let parameters = self.parse_function_parameters()?;
         if !self.expect_peek(Token::Lbrace) {
-            panic!("Missing Left Brace");
+            return None;
         }
-        let body = self.parse_block_statement();
-        Box::new(FunctionLiteral::new(tok, parameters, body))
+        let body = self.parse_block_statement()?;
+        Some(Box::new(FunctionLiteral::new(tok, parameters, body)))
     }
 
-    fn parse_function_parameters(&mut self) -> Vec<Identifier> {
+    fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
         let mut v = Vec::new();
         if self.peek_token == Some(Token::Rparen) {
             self.next_token();
-            return v;
+            return Some(v);
         }
         self.next_token();
         let tok = self.curr_token.as_ref().expect("should be present");
@@ -444,43 +429,42 @@ impl Parser {
         }
 
         if !self.expect_peek(Token::Rparen) {
-            panic!("Missing Right parenthesis");
+            return None;
         }
-        v
+        Some(v)
     }
 
-    fn parse_call_expression(&mut self, function: Box<dyn Expression>) -> Box<dyn Expression> {
-        let tok = self.curr_token.clone().expect("should exist");
-        let args = self.parse_call_arguments();
-        Box::new(CallExpression::new(tok, function, args))
+    fn parse_call_expression(
+        &mut self,
+        function: Box<dyn Expression>,
+    ) -> Option<Box<dyn Expression>> {
+        let tok = self.curr_token.clone()?;
+        let args = self.parse_call_arguments()?;
+        Some(Box::new(CallExpression::new(tok, function, args)))
     }
 
-    fn parse_call_arguments(&mut self) -> Vec<Box<dyn Expression>> {
+    fn parse_call_arguments(&mut self) -> Option<Vec<Box<dyn Expression>>> {
         let mut v = Vec::new();
         if self.peek_token == Some(Token::Rparen) {
             self.next_token();
-            return v;
+            return Some(v);
         }
 
         self.next_token();
-        let exp = self
-            .parse_expression(Priority::Lowest)
-            .expect("Could not parse expression");
+        let exp = self.parse_expression(Priority::Lowest)?;
         v.push(exp);
 
         while self.peek_token == Some(Token::Comma) {
             self.next_token();
             self.next_token();
-            let exp = self
-                .parse_expression(Priority::Lowest)
-                .expect("Could not parse expression");
+            let exp = self.parse_expression(Priority::Lowest)?;
             v.push(exp);
         }
 
         if !self.expect_peek(Token::Rparen) {
-            panic!("Missing Right Parenthesis");
+            return None;
         }
-        v
+        Some(v)
     }
 }
 
@@ -495,7 +479,7 @@ mod tests {
     use crate::ast::integer_literal::IntegerLiteral;
     use crate::ast::let_statement::LetStatement;
     use crate::ast::prefix_expression::PrefixExpression;
-    use crate::ast::{CallExpression, FunctionLiteral, Node};
+    use crate::ast::{AsAny, CallExpression, FunctionLiteral, Node};
 
     enum Types<'a> {
         String(&'a str),
@@ -591,7 +575,7 @@ mod tests {
     fn test_return_statement(return_statement: &ReturnStatement, identifier: Types, value: Types) {
         match identifier {
             Types::String(v) => assert_eq!(return_statement.token_literal(), v),
-            _ =>{
+            _ => {
                 unreachable!()
             }
         }
@@ -600,12 +584,11 @@ mod tests {
             Types::Isize(x) => test_literal(return_statement.return_value(), Types::Isize(x)),
             Types::Bool(x) => test_literal(return_statement.return_value(), Types::Bool(x)),
         }
-        
     }
     fn test_let_statement(let_statement: &LetStatement, identifier: Types, value: Types) {
         match identifier {
             Types::String(v) => test_ident(let_statement.name(), v),
-            _ =>{
+            _ => {
                 unreachable!()
             }
         }
@@ -614,7 +597,19 @@ mod tests {
             Types::Isize(x) => test_literal(let_statement.value(), Types::Isize(x)),
             Types::Bool(x) => test_literal(let_statement.value(), Types::Bool(x)),
         }
-        
+    }
+
+    #[test]
+    fn test_let_with_func() {
+        let input = "let x = fn(x, y) {x + y};";
+        let program = test_helper(input);
+        let statement = program.statements.get(0).unwrap();
+        let let_statement = statement
+            .as_any()
+            .downcast_ref::<LetStatement>()
+            .expect("statement was not LetStatement");
+        assert_eq!("x", let_statement.name().token_literal());
+        assert_eq!("fn(x, y) { (x + y) }", format!("{}", let_statement.value()));
     }
 
     #[test]
