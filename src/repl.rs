@@ -1,4 +1,4 @@
-use crate::lexer::{Lexer, Token};
+use crate::{lexer::Lexer, parser::Parser};
 use std::io;
 
 pub fn start() -> Result<(), Box<dyn std::error::Error>> {
@@ -7,15 +7,20 @@ pub fn start() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", prompt);
         for line in io::stdin().lines() {
             if let Ok(line) = line {
-                let mut lex = Lexer::new(line);
-                let mut tok = lex.next_token();
+                let lex = Lexer::new(line);
+                let mut parser = Parser::new(lex);
 
-                loop {
-                    if tok == Token::Eof {
-                        break;
+                let program = parser.parse_program();
+
+                match program {
+                    Ok(program) => {
+                        println!("{}", program)
                     }
-                    println!("{}", tok);
-                    tok = lex.next_token();
+                    Err(_) => {
+                        for e in parser.errors() {
+                            println!("{}", e);
+                        }
+                    }
                 }
             }
         }

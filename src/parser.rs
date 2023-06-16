@@ -174,9 +174,7 @@ impl Parser {
         }
         let return_token = return_token.unwrap();
         self.next_token();
-        let return_value = self
-            .parse_expression(Priority::Lowest)
-            .expect("could not parse expression in return statement");
+        let return_value = self.parse_expression(Priority::Lowest)?;
         if self.peek_token == Some(Token::Semicolon) {
             self.next_token();
         }
@@ -184,11 +182,11 @@ impl Parser {
     }
 
     fn parse_let_statement(&mut self) -> Option<Box<dyn Statement>> {
-        let let_token = self.curr_token.clone().expect("no current token found");
+        let let_token = self.curr_token.clone()?;
         if !self.expect_peek(Token::Ident("".into())) {
             return None;
         }
-        let ident_token = self.curr_token.clone().expect("no current token found");
+        let ident_token = self.curr_token.clone()?;
         let ident_literal = match &ident_token {
             Token::Ident(value) => value.clone(),
             _ => unreachable!(),
@@ -199,9 +197,7 @@ impl Parser {
             return None;
         }
         self.next_token();
-        let value = self
-            .parse_expression(Priority::Lowest)
-            .expect("Could not parse expression in let statement");
+        let value = self.parse_expression(Priority::Lowest)?;
         if self.peek_token == Some(Token::Semicolon) {
             self.next_token();
         }
@@ -240,14 +236,9 @@ impl Parser {
     }
 
     fn parse_expression_statement(&mut self) -> Option<Box<dyn Statement>> {
-        let expression = self
-            .parse_expression(Priority::Lowest)
-            .expect("Should never be None");
+        let expression = self.parse_expression(Priority::Lowest)?;
 
-        let stmt = ExpressionStatement::new(
-            self.curr_token.take().expect("Should never be None"),
-            expression,
-        );
+        let stmt = ExpressionStatement::new(self.curr_token.take()?, expression);
 
         if self.peek_token == Some(Token::Semicolon) {
             self.next_token();
@@ -285,14 +276,9 @@ impl Parser {
     fn parse_if_expression(&mut self) -> Option<Box<dyn Expression>> {
         match self.expect_peek(Token::Lparen) {
             true => {
-                let curr_token = self
-                    .curr_token
-                    .clone()
-                    .expect("Could not find current token");
+                let curr_token = self.curr_token.clone()?;
                 self.next_token();
-                let condition = self
-                    .parse_expression(Priority::Lowest)
-                    .expect("Could not parse expression");
+                let condition = self.parse_expression(Priority::Lowest)?;
                 if !self.expect_peek(Token::Rparen) {
                     return None;
                 }
@@ -367,9 +353,7 @@ impl Parser {
         let tok = self.curr_token.as_ref()?.clone();
         let literal = String::from(tok.literal());
         self.next_token();
-        let expression_right = self
-            .parse_expression(Priority::Prefix)
-            .expect("Failed to parse right side of prefix expression");
+        let expression_right = self.parse_expression(Priority::Prefix)?;
         Some(Box::new(PrefixExpression::new(
             tok,
             literal,
@@ -414,7 +398,7 @@ impl Parser {
             return Some(v);
         }
         self.next_token();
-        let tok = self.curr_token.as_ref().expect("should be present");
+        let tok = self.curr_token.as_ref()?;
         let literal = tok.literal();
         let ident = Identifier::new(tok.clone(), literal.to_string());
         v.push(ident);
@@ -422,7 +406,7 @@ impl Parser {
         while self.peek_token == Some(Token::Comma) {
             self.next_token();
             self.next_token();
-            let tok = self.curr_token.as_ref().expect("should be present");
+            let tok = self.curr_token.as_ref()?;
             let literal = tok.literal();
             let ident = Identifier::new(tok.clone(), literal.to_string());
             v.push(ident);
