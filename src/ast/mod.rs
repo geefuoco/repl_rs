@@ -4,6 +4,7 @@ use std::fmt::{Debug, Display};
 
 pub mod block_statement;
 pub mod boolean_literal;
+pub mod call_expression;
 pub mod expression_statement;
 pub mod function_literal;
 pub mod identifier;
@@ -16,6 +17,7 @@ pub mod return_statement;
 
 pub use block_statement::BlockStatement;
 pub use boolean_literal::BooleanLiteral;
+pub use call_expression::CallExpression;
 pub use expression_statement::ExpressionStatement;
 pub use function_literal::FunctionLiteral;
 pub use identifier::Identifier;

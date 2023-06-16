@@ -1,5 +1,6 @@
 use crate::ast::BlockStatement;
 use crate::ast::BooleanLiteral;
+use crate::ast::CallExpression;
 use crate::ast::ExpressionStatement;
 use crate::ast::FunctionLiteral;
 use crate::ast::IfExpression;
@@ -51,6 +52,7 @@ impl Parser {
             (Token::Minus.token_type(), Priority::Sum),
             (Token::Divide.token_type(), Priority::Product),
             (Token::Multiply.token_type(), Priority::Product),
+            (Token::Lparen.token_type(), Priority::Call),
         ]);
         let mut p = Parser {
             lexer,
@@ -130,6 +132,7 @@ impl Parser {
         self.register_infix(Token::NotEqual.token_type(), Parser::parse_infix_expression);
         self.register_infix(Token::Lt.token_type(), Parser::parse_infix_expression);
         self.register_infix(Token::Gt.token_type(), Parser::parse_infix_expression);
+        self.register_infix(Token::Lparen.token_type(), Parser::parse_call_expression);
     }
 
     fn register_prefix_fns(&mut self) {
@@ -464,6 +467,40 @@ impl Parser {
         }
         v
     }
+
+    fn parse_call_expression(&mut self, function: Box<dyn Expression>) -> Box<dyn Expression> {
+        let tok = self.curr_token.clone().expect("should exist");
+        let args = self.parse_call_arguments();
+        Box::new(CallExpression::new(tok, function, args))
+    }
+
+    fn parse_call_arguments(&mut self) -> Vec<Box<dyn Expression>> {
+        let mut v = Vec::new();
+        if self.peek_token == Some(Token::Rparen) {
+            self.next_token();
+            return v;
+        }
+
+        self.next_token();
+        let exp = self
+            .parse_expression(Priority::Lowest)
+            .expect("Could not parse expression");
+        v.push(exp);
+
+        while self.peek_token == Some(Token::Comma) {
+            self.next_token();
+            self.next_token();
+            let exp = self
+                .parse_expression(Priority::Lowest)
+                .expect("Could not parse expression");
+            v.push(exp);
+        }
+
+        if !self.expect_peek(Token::Rparen) {
+            panic!("Missing Right Parenthesis");
+        }
+        v
+    }
 }
 
 #[cfg(test)]
@@ -477,7 +514,7 @@ mod tests {
     use crate::ast::integer_literal::IntegerLiteral;
     use crate::ast::let_statement::LetStatement;
     use crate::ast::prefix_expression::PrefixExpression;
-    use crate::ast::{FunctionLiteral, Node};
+    use crate::ast::{CallExpression, FunctionLiteral, Node};
 
     enum Types<'a> {
         String(&'a str),
@@ -874,6 +911,15 @@ mod tests {
             ("2 / (5 + 5)", "(2 / (5 + 5))\n"),
             ("-(5 + 5)", "(-(5 + 5))\n"),
             ("!(true == true)", "(!(true == true))\n"),
+            ("a + add(b * c) + d", "((a + add((b * c))) + d)\n"),
+            (
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))\n",
+            ),
+            (
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))\n",
+            ),
         ];
 
         for input in input_expected {
@@ -1069,5 +1115,47 @@ mod tests {
                 test_ident(ident, expected.get(i).unwrap());
             }
         }
+    }
+
+    #[test]
+    fn test_call_expression() {
+        let input = "add(1, 2 * 3, 4 + 5)";
+        let program = test_helper(input);
+
+        let statement = program.statements.get(0).unwrap();
+        let exp_statement = statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("statement was not an ExpressionStatement");
+        let call_expression = exp_statement
+            .expression()
+            .as_any()
+            .downcast_ref::<CallExpression>()
+            .expect("ExpressionStatement was not a CallExpression");
+        let ident = call_expression
+            .function()
+            .as_any()
+            .downcast_ref::<Identifier>()
+            .expect("function was not an Identifier");
+        test_ident(ident, "add");
+        assert_eq!(call_expression.arguments().len(), 3);
+
+        test_literal(call_expression.arguments().get(0).unwrap(), Types::Isize(1));
+        let first_infix = call_expression
+            .arguments()
+            .get(1)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<InfixExpression>()
+            .expect("argument was not an InifixExpression");
+        test_infix_expression(first_infix, Types::Isize(2), "*", Types::Isize(3));
+        let second_infix = call_expression
+            .arguments()
+            .get(2)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<InfixExpression>()
+            .expect("argument was not an InifixExpression");
+        test_infix_expression(second_infix, Types::Isize(4), "+", Types::Isize(5));
     }
 }
