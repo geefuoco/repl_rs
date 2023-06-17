@@ -1045,6 +1045,7 @@ mod tests {
         let input = "fn(x, y) { x + y }";
         let program = test_helper(input);
         let statement = program.statements.get(0).unwrap();
+        println!("{}", statement);
         let exp_statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
             Some(v) => v,
             None => panic!("statement was not an ExpressionStatement"),

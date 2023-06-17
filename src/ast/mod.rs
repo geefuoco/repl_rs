@@ -79,6 +79,12 @@ impl Node for Program {
     }
 }
 
+impl AsAny for Program {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 pub struct OptionalBlockStatement<T>(Option<T>);
 
 impl<T> OptionalBlockStatement<T> {
@@ -101,9 +107,8 @@ mod tests {
             Box::new(identifier::Identifier::new(
                 Token::Ident("another_var".into()),
                 "another_var".into(),
-            ))
-        ) 
-        ));
+            )),
+        )));
 
         let mut test_str = String::new();
         let program = Program { statements: v };
