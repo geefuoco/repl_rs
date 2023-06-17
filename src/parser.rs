@@ -250,11 +250,8 @@ impl Parser {
         if self.curr_token.is_none() {
             return None;
         }
-        let token_type = self.curr_token.as_mut().unwrap().token_type();
-        let prefix_func = self
-            .prefix_parse_fns
-            .get(&token_type)
-            .expect(format!("Could not find function with key: {}", token_type).as_str());
+        let token_type = self.curr_token.as_mut()?.token_type();
+        let prefix_func = self.prefix_parse_fns.get(&token_type)?;
         let mut left_exp = prefix_func(self);
 
         while self.peek_token != Some(Token::Semicolon) && precedence < self.peek_precedence() {

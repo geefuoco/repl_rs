@@ -2,7 +2,7 @@ use crate::ast::AsAny;
 
 use super::{Object, ObjectTypes};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct Integer {
     value: isize,
 }

@@ -1,7 +1,9 @@
 use crate::ast::AsAny;
+use crate::ast::BlockStatement;
 use crate::ast::BooleanLiteral;
 use crate::ast::Expression;
 use crate::ast::ExpressionStatement;
+use crate::ast::IfExpression;
 use crate::ast::InfixExpression;
 use crate::ast::IntegerLiteral;
 use crate::ast::LetStatement;
@@ -19,6 +21,13 @@ use crate::object::ObjectTypes;
 const TRUE: Boolean = Boolean { value: true };
 const FALSE: Boolean = Boolean { value: false };
 const NULL: Null = Null {};
+
+fn bool_helper(b: bool) -> Boolean {
+    if b {
+        return TRUE;
+    }
+    FALSE
+}
 
 fn eval_helper<T: 'static>(node: &(impl Node + AsAny)) -> bool {
     node.as_any().downcast_ref::<T>().is_some()
@@ -54,21 +63,22 @@ fn eval_statements(statements: &Vec<Box<dyn Statement>>) -> Box<dyn Object> {
     let mut result: Option<Box<dyn Object>> = None;
     for stmt in statements {
         if eval_helper_statement::<LetStatement>(stmt) {
-            let value = safely_downcast_statement::<LetStatement>(stmt);
-            result = Some(eval(value));
+            todo!()
         } else if eval_helper_statement::<ReturnStatement>(stmt) {
             let value = safely_downcast_statement::<ReturnStatement>(stmt);
-            result = Some(eval(value));
+            result = Some(eval_expression(value.return_value()));
         } else if eval_helper_statement::<ExpressionStatement>(stmt) {
             let value = safely_downcast_statement::<ExpressionStatement>(stmt);
-            result = Some(eval(value));
+            result = Some(eval_expression(value.expression()));
+        } else if eval_helper_statement::<BlockStatement>(stmt) {
+            let value = safely_downcast_statement::<BlockStatement>(stmt);
+            result = Some(eval_statements(value.statements()));
         } else {
             unreachable!()
         }
     }
     result.expect("Could not evaluate any statements")
 }
-
 
 fn eval_expression(node: &Box<dyn Expression>) -> Box<dyn Object> {
     if eval_helper_expression::<IntegerLiteral>(node) {
@@ -90,6 +100,9 @@ fn eval_expression(node: &Box<dyn Expression>) -> Box<dyn Object> {
         let left = eval_expression(value.expression_left());
         let right = eval_expression(value.expression_right());
         return eval_infix_expression(value.operator(), &left, &right);
+    } else if eval_helper_expression::<IfExpression>(node) {
+        let value = safely_downcast_expression::<IfExpression>(node);
+        return eval_if_expression(value);
     } else {
         return Box::new(NULL);
     }
@@ -127,16 +140,27 @@ fn eval_prefix_expression(operator: &str, right: &Box<dyn Object>) -> Box<dyn Ob
     }
 }
 
-fn eval_infix_expression(operator: &str, left: &Box<dyn Object>, right: &Box<dyn Object>) -> Box<dyn Object> {
+fn eval_infix_expression(
+    operator: &str,
+    left: &Box<dyn Object>,
+    right: &Box<dyn Object>,
+) -> Box<dyn Object> {
     if left.obj_type() == ObjectTypes::INTEGER && right.obj_type() == ObjectTypes::INTEGER {
         let left = left.as_integer().expect("Could not cast to Integer");
         let right = right.as_integer().expect("Could not cast to Integer");
-        return eval_integer_infix_expression(operator, left, right)
+        return eval_integer_infix_expression(operator, left, right);
+    } else if operator == "==" {
+        let left = left.as_boolean().expect("Could not cast to Boolean");
+        let right = right.as_boolean().expect("Could not cast to Boolean");
+        Box::new(bool_helper(left == right))
+    } else if operator == "!=" {
+        let left = left.as_boolean().expect("Could not cast to Boolean");
+        let right = right.as_boolean().expect("Could not cast to Boolean");
+        Box::new(bool_helper(left != right))
     } else {
         Box::new(NULL)
     }
 }
-
 
 fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) -> Box<dyn Object> {
     match operator {
@@ -144,7 +168,32 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
         "-" => Box::new(Integer::new(left.value() - right.value())),
         "*" => Box::new(Integer::new(left.value() * right.value())),
         "/" => Box::new(Integer::new(left.value() / right.value())),
-        _ => Box::new(NULL)
+        "<" => Box::new(Boolean::new(left.value() < right.value())),
+        ">" => Box::new(Boolean::new(left.value() > right.value())),
+        "==" => Box::new(Boolean::new(left.value() == right.value())),
+        "!=" => Box::new(Boolean::new(left.value() != right.value())),
+        _ => Box::new(NULL),
+    }
+}
+
+fn eval_if_expression(exp: &IfExpression) -> Box<dyn Object> {
+    let condition = eval_expression(exp.condition());
+    if is_truthy(&condition) {
+        return eval_statements(exp.consequence().statements());
+    } else if exp.alternative().is_some() {
+        return eval_statements(exp.alternative().as_ref().unwrap().statements());
+    } else {
+        return Box::new(NULL);
+    }
+}
+
+fn is_truthy(obj: &Box<dyn Object>) -> bool {
+    match obj.obj_type() {
+        ObjectTypes::INTEGER =>{true},
+        ObjectTypes::NULL=>{false},
+        ObjectTypes::BOOLEAN=>{
+            obj.inspect().parse::<bool>().expect("object was not a Boolean")
+        }
     }
 }
 
@@ -156,10 +205,11 @@ pub fn eval(node: &(impl Node + AsAny)) -> Box<dyn Object> {
     //     let value = safely_downcast::<BooleanLiteral>(node);
     //     return Box::new(Boolean::new(*value.value()));
     // } else if eval_helper::<ExpressionStatement>(node) {
-    if eval_helper::<ExpressionStatement>(node) {
-        let value = safely_downcast::<ExpressionStatement>(node);
-        return eval_expression(value.expression());
-    } else if eval_helper::<Program>(node) {
+    // if eval_helper::<ExpressionStatement>(node) {
+    //     let value = safely_downcast::<ExpressionStatement>(node);
+    //     return eval_expression(value.expression());
+    // } else if eval_helper::<Program>(node) {
+    if eval_helper::<Program>(node) {
         let value = safely_downcast::<Program>(node);
         return eval_statements(&value.statements);
     } else {
@@ -195,6 +245,10 @@ mod test {
         assert_eq!(exp, obj.value());
     }
 
+    fn test_null(obj: Box<dyn Object>) {
+        assert!(obj.obj_type() == ObjectTypes::NULL);
+    }
+
     #[test]
     fn eval_works() {
         let inputs = [
@@ -227,7 +281,26 @@ mod test {
 
     #[test]
     fn eval_bool_expression() {
-        let inputs = [("true", true), ("false", false)];
+        let inputs = [
+            ("true", true),
+            ("false", false),
+            ("true == true", true),
+            ("true == false", false),
+            ("true != true", false),
+            ("true != false", true),
+            ("false == false", true),
+            ("false != false", false),
+            ("(1 < 2) == true", true),
+            ("(1 > 2) == true", false),
+            ("(1 < 2) == false", false),
+            ("(1 > 2) == false", true),
+            ("1 < 2", true),
+            ("1 == 1", true),
+            ("1 != 1", false),
+            ("1 > 2", false),
+            ("1 < 1", false),
+            ("1 != 2", true),
+        ];
 
         for (s, i) in inputs {
             let evaluated = test_eval(s);
@@ -250,6 +323,38 @@ mod test {
             let evaluated = test_eval(s);
             println!("{:?}", evaluated);
             test_bool(evaluated, &i);
+        }
+    }
+
+    #[test]
+    fn test_if_else_expressions() {
+        let inputs = [
+            ("if (true) { 10 }", Some(10)),
+            ("if (1) { 10 }", Some(10)),
+            ("if (1 < 2) { 10 }", Some(10)),
+            ("if (1 > 2) { 10 } else { 20 }", Some(20)),
+            ("if (1 < 2) { 10 } else { 20 }", Some(10)),
+        ];
+
+        for (s, i) in inputs {
+            let evaluated = test_eval(s);
+            match evaluated.as_any().downcast_ref::<Integer>() {
+                Some(_) => test_int(evaluated, &i.expect("No integer found")),
+                None => assert!(false, "did not evaluate to an integer")
+            }
+        }
+
+        let inputs = [
+            ("if (false) { 10 }"),
+            ("if (1 > 2) { 10 }"),
+        ];
+
+        for s in inputs {
+            let evaluated = test_eval(s);
+            match evaluated.as_any().downcast_ref::<Null>() {
+                Some(_) => test_null(evaluated),
+                None => assert!(false, "did not evaluate to NULL")
+            }
         }
     }
 }

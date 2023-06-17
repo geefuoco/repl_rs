@@ -2,7 +2,7 @@ use crate::ast::AsAny;
 
 use super::{Object, ObjectType, ObjectTypes};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct Boolean {
     pub value: bool,
 }

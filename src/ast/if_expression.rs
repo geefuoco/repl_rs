@@ -32,8 +32,8 @@ impl IfExpression {
         &self.consequence
     }
 
-    pub fn condition(&self) -> &dyn Expression {
-        self.condition.as_ref()
+    pub fn condition(&self) -> &Box<dyn Expression> {
+        &self.condition
     }
 
     pub fn alternative(&self) -> &Option<BlockStatement> {
