@@ -2,6 +2,7 @@ use crate::ast::AsAny;
 use crate::ast::BooleanLiteral;
 use crate::ast::Expression;
 use crate::ast::ExpressionStatement;
+use crate::ast::InfixExpression;
 use crate::ast::IntegerLiteral;
 use crate::ast::LetStatement;
 use crate::ast::Node;
@@ -17,7 +18,7 @@ use crate::object::ObjectTypes;
 
 const TRUE: Boolean = Boolean { value: true };
 const FALSE: Boolean = Boolean { value: false };
-const NULL: Null = Null{};
+const NULL: Null = Null {};
 
 fn eval_helper<T: 'static>(node: &(impl Node + AsAny)) -> bool {
     node.as_any().downcast_ref::<T>().is_some()
@@ -68,6 +69,7 @@ fn eval_statements(statements: &Vec<Box<dyn Statement>>) -> Box<dyn Object> {
     result.expect("Could not evaluate any statements")
 }
 
+
 fn eval_expression(node: &Box<dyn Expression>) -> Box<dyn Object> {
     if eval_helper_expression::<IntegerLiteral>(node) {
         let value = safely_downcast_expression::<IntegerLiteral>(node);
@@ -79,43 +81,69 @@ fn eval_expression(node: &Box<dyn Expression>) -> Box<dyn Object> {
         } else {
             return Box::new(FALSE);
         }
-    } else if eval_helper_expression::<PrefixExpression>(node){
+    } else if eval_helper_expression::<PrefixExpression>(node) {
         let value = safely_downcast_expression::<PrefixExpression>(node);
         let right = eval_expression(value.expression_right());
         return eval_prefix_expression(value.operator(), &right);
-    }else {
+    } else if eval_helper_expression::<InfixExpression>(node) {
+        let value = safely_downcast_expression::<InfixExpression>(node);
+        let left = eval_expression(value.expression_left());
+        let right = eval_expression(value.expression_right());
+        return eval_infix_expression(value.operator(), &left, &right);
+    } else {
         return Box::new(NULL);
     }
 }
 
 fn eval_bang_operator_expression(exp: &Box<dyn Object>) -> Box<dyn Object> {
     match exp.obj_type() {
-        ObjectTypes::BOOLEAN=> {
+        ObjectTypes::BOOLEAN => {
             if exp.inspect() == "true" {
                 Box::new(FALSE)
             } else {
                 Box::new(TRUE)
             }
-        },
-        ObjectTypes::NULL=> Box::new(TRUE),
-        _ => Box::new(FALSE)
+        }
+        ObjectTypes::NULL => Box::new(TRUE),
+        _ => Box::new(FALSE),
     }
 }
 
 fn eval_minus_operator_expression(exp: &Box<dyn Object>) -> Box<dyn Object> {
     match exp.obj_type() {
-        ObjectTypes::INTEGER=> {
-            let v: isize = exp.inspect().parse().expect("Value was not an isize"); 
+        ObjectTypes::INTEGER => {
+            let v: isize = exp.inspect().parse().expect("Value was not an isize");
             Box::new(Integer::new(-v))
-        },
-        _ => Box::new(NULL)
+        }
+        _ => Box::new(NULL),
     }
 }
 
-fn eval_prefix_expression(operator: &str, right: &Box<dyn Object>) -> Box<dyn Object>{
+fn eval_prefix_expression(operator: &str, right: &Box<dyn Object>) -> Box<dyn Object> {
     match operator {
         "!" => eval_bang_operator_expression(right),
         "-" => eval_minus_operator_expression(right),
+        _ => Box::new(NULL),
+    }
+}
+
+fn eval_infix_expression(operator: &str, left: &Box<dyn Object>, right: &Box<dyn Object>) -> Box<dyn Object> {
+    if left.obj_type() == ObjectTypes::INTEGER && right.obj_type() == ObjectTypes::INTEGER {
+        let left = left.as_integer().expect("Could not cast to Integer");
+        let right = right.as_integer().expect("Could not cast to Integer");
+        return eval_integer_infix_expression(operator, left, right)
+    } else {
+        Box::new(NULL)
+    }
+}
+
+
+fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) -> Box<dyn Object> {
+    match operator {
+        "+" => Box::new(Integer::new(left.value() + right.value())),
+        "-" => Box::new(Integer::new(left.value() - right.value())),
+        "*" => Box::new(Integer::new(left.value() * right.value())),
+        "/" => Box::new(Integer::new(left.value() / right.value())),
         _ => Box::new(NULL)
     }
 }
@@ -169,7 +197,27 @@ mod test {
 
     #[test]
     fn eval_works() {
-        let inputs = [("5", 5), ("10", 10), ("-5", -5), ("-10", -10)];
+        let inputs = [
+            ("5", 5),
+            ("10", 10),
+            ("-5", -5),
+            ("-10", -10),
+            ("5 + 5 + 5", 15),
+            ("2 * 2 * 2 * 2 * 2", 32),
+            ("-50 + 100 + -50", 0),
+            ("5 * 2 + 10", 20),
+            ("5 + 5 + 5 + 5 - 10", 10),
+            ("2 * 2 * 2 * 2 * 2", 32),
+            ("-50 + 100 + -50", 0),
+            ("5 * 2 + 10", 20),
+            ("5 + 2 * 10", 25),
+            ("20 + 2 * -10", 0),
+            ("50 / 2 * 2 + 10", 60),
+            ("2 * (5 + 10)", 30),
+            ("3 * 3 * 3 + 10", 37),
+            ("3 * (3 * 3) + 10", 37),
+            ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
+        ];
 
         for (s, i) in inputs {
             let evaluated = test_eval(s);
@@ -178,7 +226,7 @@ mod test {
     }
 
     #[test]
-    fn eval_bool_exprsesion() {
+    fn eval_bool_expression() {
         let inputs = [("true", true), ("false", false)];
 
         for (s, i) in inputs {
