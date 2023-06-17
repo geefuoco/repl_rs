@@ -1,24 +1,24 @@
 use crate::ast::AsAny;
-use std::fmt::Display;
+use std::fmt::{Display, Debug};
 
-mod integer;
 mod boolean;
+mod integer;
 mod null;
-pub use integer::Integer;
 pub use boolean::Boolean;
+pub use integer::Integer;
 pub use null::Null;
 
 type ObjectType = ObjectTypes;
 
-pub trait Object: AsAny {
+pub trait Object: AsAny + Debug{
     fn obj_type(&self) -> ObjectType;
     fn inspect(&self) -> String;
 }
 
-enum ObjectTypes {
+pub enum ObjectTypes {
     INTEGER,
     BOOLEAN,
-    NULL
+    NULL,
 }
 
 impl Display for ObjectTypes {
@@ -30,4 +30,3 @@ impl Display for ObjectTypes {
         }
     }
 }
-

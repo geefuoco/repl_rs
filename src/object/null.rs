@@ -2,6 +2,7 @@ use crate::ast::AsAny;
 
 use super::{Object, ObjectType, ObjectTypes};
 
+#[derive(Debug)]
 pub struct Null {}
 
 impl Object for Null {

@@ -2,6 +2,7 @@ use crate::ast::AsAny;
 
 use super::{Object, ObjectTypes};
 
+#[derive(Debug)]
 pub struct Integer {
     value: isize,
 }
@@ -25,7 +26,7 @@ impl Object for Integer {
         format!("{}", self.value)
     }
 }
-impl AsAny for Integer{
+impl AsAny for Integer {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }

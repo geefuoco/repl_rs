@@ -1,9 +1,10 @@
 use crate::ast::AsAny;
 
-use super::{Object, ObjectTypes, ObjectType};
+use super::{Object, ObjectType, ObjectTypes};
 
+#[derive(Debug)]
 pub struct Boolean {
-    value: bool,
+    pub value: bool,
 }
 
 impl Boolean {
@@ -25,7 +26,7 @@ impl Object for Boolean {
         format!("{}", self.value)
     }
 }
-impl AsAny for Boolean{
+impl AsAny for Boolean {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
