@@ -5,10 +5,12 @@ use std::{
 };
 
 mod boolean;
+mod error;
 mod integer;
 mod null;
 mod return_object;
 pub use boolean::Boolean;
+pub use error::Error as ErrorObject;
 pub use integer::Integer;
 pub use null::Null;
 pub use return_object::Return;
@@ -78,6 +80,9 @@ pub trait Object: AsAny + Debug {
             ObjectTypes::RETURN => Err(CastError {
                 obj_type: String::from("Return"),
             }),
+            ObjectTypes::ERROR=> Err(CastError {
+                obj_type: String::from("Error"),
+            }),
         }
     }
 
@@ -105,6 +110,12 @@ pub trait Object: AsAny + Debug {
             _ => false,
         }
     }
+    fn is_err(&self) -> bool {
+        match self.obj_type() {
+            ObjectTypes::ERROR=> true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -113,6 +124,7 @@ pub enum ObjectTypes {
     BOOLEAN,
     NULL,
     RETURN,
+    ERROR,
 }
 
 impl Display for ObjectTypes {
@@ -122,6 +134,7 @@ impl Display for ObjectTypes {
             ObjectTypes::BOOLEAN => write!(f, "BOOLEAN"),
             ObjectTypes::NULL => write!(f, "NULL"),
             ObjectTypes::RETURN => write!(f, "RETURN"),
+            ObjectTypes::ERROR=> write!(f, "ERROR"),
         }
     }
 }

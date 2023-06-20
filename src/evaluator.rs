@@ -13,6 +13,7 @@ use crate::ast::Program;
 use crate::ast::ReturnStatement;
 use crate::ast::Statement;
 use crate::object::Boolean;
+use crate::object::ErrorObject;
 use crate::object::Integer;
 use crate::object::Null;
 use crate::object::Object;
@@ -65,11 +66,15 @@ fn eval_block_statement(block: &BlockStatement) -> Option<Box<dyn Object>> {
     for stmt in block.statements() {
         let result = eval_statement(stmt)?;
 
+        if result.obj_type() == ObjectTypes::ERROR {
+            return Some(result);
+        }
+
         match result.as_any().downcast_ref::<Return>() {
-            Some(_) => { 
+            Some(_) => {
                 return Some(result);
-            },
-            None => { final_result = Some(result)}
+            }
+            None => final_result = Some(result),
         }
     }
     final_result
@@ -82,13 +87,16 @@ fn eval_statement(statement: &Box<dyn Statement>) -> Option<Box<dyn Object>> {
     } else if eval_helper_statement::<ReturnStatement>(statement) {
         let value = safely_downcast_statement::<ReturnStatement>(statement);
         let return_value = eval_expression(value.return_value());
+        if return_value.is_err() {
+            return Some(return_value);
+        }
         return Some(Box::new(Return::new(return_value)));
     } else if eval_helper_statement::<ExpressionStatement>(statement) {
         let value = safely_downcast_statement::<ExpressionStatement>(statement);
         result = Some(eval_expression(value.expression()));
     } else if eval_helper_statement::<BlockStatement>(statement) {
         let value = safely_downcast_statement::<BlockStatement>(statement);
-        let block_statement = eval_block_statement(value)?; 
+        let block_statement = eval_block_statement(value)?;
         result = Some(block_statement);
     } else {
         unreachable!()
@@ -98,6 +106,7 @@ fn eval_statement(statement: &Box<dyn Statement>) -> Option<Box<dyn Object>> {
 
 fn eval_statements(statements: &Vec<Box<dyn Statement>>) -> Box<dyn Object> {
     let mut result: Option<Box<dyn Object>> = None;
+    let mut is_err = false;
     for stmt in statements {
         if eval_helper_statement::<LetStatement>(stmt) {
             todo!()
@@ -113,6 +122,12 @@ fn eval_statements(statements: &Vec<Box<dyn Statement>>) -> Box<dyn Object> {
             return return_value;
         } else {
             unreachable!()
+        }
+        if let Some(ref result) = result {
+            is_err = result.is_err();
+        }
+        if is_err {
+            return result.expect("Error should be returned here");
         }
     }
     result.expect("Could not evaluate any statements")
@@ -132,11 +147,20 @@ fn eval_expression(node: &Box<dyn Expression>) -> Box<dyn Object> {
     } else if eval_helper_expression::<PrefixExpression>(node) {
         let value = safely_downcast_expression::<PrefixExpression>(node);
         let right = eval_expression(value.expression_right());
+        if right.is_err() {
+            return right;
+        }
         return eval_prefix_expression(value.operator(), &right);
     } else if eval_helper_expression::<InfixExpression>(node) {
         let value = safely_downcast_expression::<InfixExpression>(node);
         let left = eval_expression(value.expression_left());
+        if left.is_err() {
+            return left;
+        }
         let right = eval_expression(value.expression_right());
+        if right.is_err() {
+            return right;
+        }
         return eval_infix_expression(value.operator(), &left, &right);
     } else if eval_helper_expression::<IfExpression>(node) {
         let value = safely_downcast_expression::<IfExpression>(node);
@@ -166,7 +190,10 @@ fn eval_minus_operator_expression(exp: &Box<dyn Object>) -> Box<dyn Object> {
             let v: isize = exp.inspect().parse().expect("Value was not an isize");
             Box::new(Integer::new(-v))
         }
-        _ => Box::new(NULL),
+        _ => Box::new(ErrorObject::new(format!(
+            "unknown operator: -{}",
+            exp.obj_type()
+        ))),
     }
 }
 
@@ -174,7 +201,11 @@ fn eval_prefix_expression(operator: &str, right: &Box<dyn Object>) -> Box<dyn Ob
     match operator {
         "!" => eval_bang_operator_expression(right),
         "-" => eval_minus_operator_expression(right),
-        _ => Box::new(NULL),
+        _ => Box::new(ErrorObject::new(format!(
+            "unknown operator: {}{}",
+            operator,
+            right.obj_type()
+        ))),
     }
 }
 
@@ -195,8 +226,20 @@ fn eval_infix_expression(
         let left = left.as_boolean().expect("Could not cast to Boolean");
         let right = right.as_boolean().expect("Could not cast to Boolean");
         Box::new(bool_helper(left != right))
+    } else if left.obj_type() != right.obj_type() {
+        Box::new(ErrorObject::new(format!(
+            "type mismatch: {} {} {}",
+            left.obj_type(),
+            operator,
+            right.obj_type()
+        )))
     } else {
-        Box::new(NULL)
+        Box::new(ErrorObject::new(format!(
+            "unknown operator: {} {} {}",
+            left.obj_type(),
+            operator,
+            right.obj_type()
+        )))
     }
 }
 
@@ -210,12 +253,20 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
         ">" => Box::new(Boolean::new(left.value() > right.value())),
         "==" => Box::new(Boolean::new(left.value() == right.value())),
         "!=" => Box::new(Boolean::new(left.value() != right.value())),
-        _ => Box::new(NULL),
+        _ => Box::new(ErrorObject::new(format!(
+            "unknown operator: {} {} {}",
+            left.obj_type(),
+            operator,
+            right.obj_type()
+        ))),
     }
 }
 
 fn eval_if_expression(exp: &IfExpression) -> Option<Box<dyn Object>> {
     let condition = eval_expression(exp.condition());
+    if condition.is_err() {
+        return Some(condition);
+    }
     if is_truthy(&condition) {
         return eval_block_statement(exp.consequence());
     } else if exp.alternative().is_some() {
@@ -234,6 +285,7 @@ fn is_truthy(obj: &Box<dyn Object>) -> bool {
             .parse::<bool>()
             .expect("object was not a Boolean"),
         ObjectTypes::RETURN => false,
+        _ => false,
     }
 }
 
@@ -249,7 +301,11 @@ pub fn eval_program(node: &(impl Node + AsAny)) -> Box<dyn Object> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{lexer::Lexer, object::Integer, parser::Parser};
+    use crate::{
+        lexer::Lexer,
+        object::{ErrorObject, Integer},
+        parser::Parser,
+    };
 
     fn test_eval(input: &str) -> Box<dyn Object> {
         let l = Lexer::new(input.into());
@@ -405,9 +461,36 @@ mod test {
         for (s, i) in inputs {
             let evaluated = test_eval(s);
             match evaluated.as_any().downcast_ref::<Return>() {
-                Some(ret) =>test_int(ret.value(), &i),
-                None =>{}
+                Some(ret) => test_int(ret.value(), &i),
+                None => {}
             }
+        }
+    }
+
+    #[test]
+    fn test_error_handling() {
+        let inputs = [
+            ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
+            ("5 + true; 5", "type mismatch: INTEGER + BOOLEAN"),
+            ("-true;", "unknown operator: -BOOLEAN"),
+            ("false + true;", "unknown operator: BOOLEAN + BOOLEAN"),
+            (
+                "if (10 > 1) {false + true;}",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            (
+                "if (10 > 1) {if (10 > 1) {false + true;} return 1;}",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+        ];
+
+        for (s, exp) in inputs {
+            let evaluated = test_eval(s);
+            let error_obj = evaluated
+                .as_any()
+                .downcast_ref::<ErrorObject>()
+                .expect(format!("Could not cast {:?} to error object", &evaluated).as_str());
+            assert_eq!(exp, error_obj.message());
         }
     }
 }
