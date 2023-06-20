@@ -17,6 +17,7 @@ use crate::object::Integer;
 use crate::object::Null;
 use crate::object::Object;
 use crate::object::ObjectTypes;
+use crate::object::Return;
 
 const TRUE: Boolean = Boolean { value: true };
 const FALSE: Boolean = Boolean { value: false };
@@ -59,20 +60,57 @@ fn safely_downcast_expression<T: 'static>(node: &Box<dyn Expression>) -> &T {
         .expect("Could not safely downcast")
 }
 
+fn eval_block_statement(block: &BlockStatement) -> Option<Box<dyn Object>> {
+    let mut final_result: Option<Box<dyn Object>> = None;
+    for stmt in block.statements() {
+        let result = eval_statement(stmt)?;
+
+        match result.as_any().downcast_ref::<Return>() {
+            Some(_) => { 
+                return Some(result);
+            },
+            None => { final_result = Some(result)}
+        }
+    }
+    final_result
+}
+
+fn eval_statement(statement: &Box<dyn Statement>) -> Option<Box<dyn Object>> {
+    let mut result: Option<Box<dyn Object>> = None;
+    if eval_helper_statement::<LetStatement>(statement) {
+        todo!()
+    } else if eval_helper_statement::<ReturnStatement>(statement) {
+        let value = safely_downcast_statement::<ReturnStatement>(statement);
+        let return_value = eval_expression(value.return_value());
+        return Some(Box::new(Return::new(return_value)));
+    } else if eval_helper_statement::<ExpressionStatement>(statement) {
+        let value = safely_downcast_statement::<ExpressionStatement>(statement);
+        result = Some(eval_expression(value.expression()));
+    } else if eval_helper_statement::<BlockStatement>(statement) {
+        let value = safely_downcast_statement::<BlockStatement>(statement);
+        let block_statement = eval_block_statement(value)?; 
+        result = Some(block_statement);
+    } else {
+        unreachable!()
+    }
+    result
+}
+
 fn eval_statements(statements: &Vec<Box<dyn Statement>>) -> Box<dyn Object> {
     let mut result: Option<Box<dyn Object>> = None;
     for stmt in statements {
         if eval_helper_statement::<LetStatement>(stmt) {
             todo!()
-        } else if eval_helper_statement::<ReturnStatement>(stmt) {
-            let value = safely_downcast_statement::<ReturnStatement>(stmt);
-            result = Some(eval_expression(value.return_value()));
         } else if eval_helper_statement::<ExpressionStatement>(stmt) {
             let value = safely_downcast_statement::<ExpressionStatement>(stmt);
             result = Some(eval_expression(value.expression()));
         } else if eval_helper_statement::<BlockStatement>(stmt) {
             let value = safely_downcast_statement::<BlockStatement>(stmt);
-            result = Some(eval_statements(value.statements()));
+            result = eval_block_statement(value);
+        } else if eval_helper_statement::<ReturnStatement>(stmt) {
+            let value = safely_downcast_statement::<ReturnStatement>(stmt);
+            let return_value = eval_expression(value.return_value());
+            return return_value;
         } else {
             unreachable!()
         }
@@ -102,7 +140,7 @@ fn eval_expression(node: &Box<dyn Expression>) -> Box<dyn Object> {
         return eval_infix_expression(value.operator(), &left, &right);
     } else if eval_helper_expression::<IfExpression>(node) {
         let value = safely_downcast_expression::<IfExpression>(node);
-        return eval_if_expression(value);
+        return eval_if_expression(value).expect("could not evaluate if expression");
     } else {
         return Box::new(NULL);
     }
@@ -176,39 +214,30 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
     }
 }
 
-fn eval_if_expression(exp: &IfExpression) -> Box<dyn Object> {
+fn eval_if_expression(exp: &IfExpression) -> Option<Box<dyn Object>> {
     let condition = eval_expression(exp.condition());
     if is_truthy(&condition) {
-        return eval_statements(exp.consequence().statements());
+        return eval_block_statement(exp.consequence());
     } else if exp.alternative().is_some() {
-        return eval_statements(exp.alternative().as_ref().unwrap().statements());
+        return eval_block_statement(exp.alternative().as_ref().unwrap());
     } else {
-        return Box::new(NULL);
+        return Some(Box::new(NULL));
     }
 }
 
 fn is_truthy(obj: &Box<dyn Object>) -> bool {
     match obj.obj_type() {
-        ObjectTypes::INTEGER =>{true},
-        ObjectTypes::NULL=>{false},
-        ObjectTypes::BOOLEAN=>{
-            obj.inspect().parse::<bool>().expect("object was not a Boolean")
-        }
+        ObjectTypes::INTEGER => true,
+        ObjectTypes::NULL => false,
+        ObjectTypes::BOOLEAN => obj
+            .inspect()
+            .parse::<bool>()
+            .expect("object was not a Boolean"),
+        ObjectTypes::RETURN => false,
     }
 }
 
-pub fn eval(node: &(impl Node + AsAny)) -> Box<dyn Object> {
-    // if eval_helper::<IntegerLiteral>(node) {
-    //     let value = safely_downcast::<IntegerLiteral>(node);
-    //     return Box::new(Integer::new(*value.value()));
-    // } else if eval_helper::<BooleanLiteral>(node) {
-    //     let value = safely_downcast::<BooleanLiteral>(node);
-    //     return Box::new(Boolean::new(*value.value()));
-    // } else if eval_helper::<ExpressionStatement>(node) {
-    // if eval_helper::<ExpressionStatement>(node) {
-    //     let value = safely_downcast::<ExpressionStatement>(node);
-    //     return eval_expression(value.expression());
-    // } else if eval_helper::<Program>(node) {
+pub fn eval_program(node: &(impl Node + AsAny)) -> Box<dyn Object> {
     if eval_helper::<Program>(node) {
         let value = safely_downcast::<Program>(node);
         return eval_statements(&value.statements);
@@ -226,10 +255,10 @@ mod test {
         let l = Lexer::new(input.into());
         let mut p = Parser::new(l);
         let program = p.parse_program().expect("Program did not parse properly");
-        eval(&program)
+        eval_program(&program)
     }
 
-    fn test_int(obj: Box<dyn Object>, exp: &isize) {
+    fn test_int(obj: &Box<dyn Object>, exp: &isize) {
         let obj = obj
             .as_any()
             .downcast_ref::<Integer>()
@@ -237,7 +266,7 @@ mod test {
         assert_eq!(exp, obj.value());
     }
 
-    fn test_bool(obj: Box<dyn Object>, exp: &bool) {
+    fn test_bool(obj: &Box<dyn Object>, exp: &bool) {
         let obj = obj
             .as_any()
             .downcast_ref::<Boolean>()
@@ -245,7 +274,7 @@ mod test {
         assert_eq!(exp, obj.value());
     }
 
-    fn test_null(obj: Box<dyn Object>) {
+    fn test_null(obj: &Box<dyn Object>) {
         assert!(obj.obj_type() == ObjectTypes::NULL);
     }
 
@@ -275,7 +304,7 @@ mod test {
 
         for (s, i) in inputs {
             let evaluated = test_eval(s);
-            test_int(evaluated, &i)
+            test_int(&evaluated, &i)
         }
     }
 
@@ -304,7 +333,7 @@ mod test {
 
         for (s, i) in inputs {
             let evaluated = test_eval(s);
-            test_bool(evaluated, &i);
+            test_bool(&evaluated, &i);
         }
     }
 
@@ -321,8 +350,7 @@ mod test {
 
         for (s, i) in inputs {
             let evaluated = test_eval(s);
-            println!("{:?}", evaluated);
-            test_bool(evaluated, &i);
+            test_bool(&evaluated, &i);
         }
     }
 
@@ -339,21 +367,46 @@ mod test {
         for (s, i) in inputs {
             let evaluated = test_eval(s);
             match evaluated.as_any().downcast_ref::<Integer>() {
-                Some(_) => test_int(evaluated, &i.expect("No integer found")),
-                None => assert!(false, "did not evaluate to an integer")
+                Some(_) => test_int(&evaluated, &i.expect("No integer found")),
+                None => assert!(false, "did not evaluate to an integer"),
             }
         }
 
-        let inputs = [
-            ("if (false) { 10 }"),
-            ("if (1 > 2) { 10 }"),
-        ];
+        let inputs = [("if (false) { 10 }"), ("if (1 > 2) { 10 }")];
 
         for s in inputs {
             let evaluated = test_eval(s);
             match evaluated.as_any().downcast_ref::<Null>() {
-                Some(_) => test_null(evaluated),
-                None => assert!(false, "did not evaluate to NULL")
+                Some(_) => test_null(&evaluated),
+                None => assert!(false, "did not evaluate to NULL"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let inputs = [
+            ("return 10;", 10),
+            ("return 10; 9;", 10),
+            ("return 2 * 5; 9;", 10),
+            ("9; return 2 * 5; 9;", 10),
+            (
+                r#"
+             if (10 > 1) {
+                if (10 > 1) {
+                    return 10;
+                }   
+                return 1;
+             }"#,
+                10,
+            ),
+        ];
+
+        for (s, i) in inputs {
+            let evaluated = test_eval(s);
+            match evaluated.as_any().downcast_ref::<Return>() {
+                Some(ret) =>test_int(ret.value(), &i),
+                None =>{}
             }
         }
     }

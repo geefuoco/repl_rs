@@ -1,4 +1,4 @@
-use crate::{lexer::Lexer, parser::Parser, evaluator};
+use crate::{evaluator, lexer::Lexer, parser::Parser};
 use std::io;
 
 pub fn start() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,7 +15,7 @@ pub fn start() -> Result<(), Box<dyn std::error::Error>> {
 
                 match program {
                     Ok(program) => {
-                        let evaluated = evaluator::eval(&program);
+                        let evaluated = evaluator::eval_program(&program);
                         println!("{}", evaluated.inspect());
                     }
                     Err(_) => {
