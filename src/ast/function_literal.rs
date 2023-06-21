@@ -1,4 +1,4 @@
-use super::{AsAny, Identifier};
+use super::Identifier;
 use crate::ast::{BlockStatement, Expression, Node, Token};
 use std::fmt::Display;
 
@@ -38,12 +38,6 @@ impl Expression for FunctionLiteral {
 impl Node for FunctionLiteral {
     fn token_literal(&self) -> &str {
         self.token.literal()
-    }
-}
-
-impl AsAny for FunctionLiteral {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

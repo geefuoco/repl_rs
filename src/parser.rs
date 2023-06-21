@@ -11,7 +11,7 @@ use crate::ast::OptionalBlockStatement;
 use crate::ast::PrefixExpression;
 use crate::ast::ReturnStatement;
 use crate::{
-    ast::{Expression, Identifier, Program, Statement},
+    ast::{Expressions, Identifier, Program, Statements},
     lexer::{Lexer, Token},
 };
 use std::collections::HashMap;
@@ -29,9 +29,9 @@ enum Priority {
     Call,
 }
 
-type PrefixParseFn = fn(p: &mut Parser) -> Option<Box<dyn Expression>>;
+type PrefixParseFn = fn(p: &mut Parser) -> Option<Expressions>;
 type InfixParseFn =
-    fn(p: &mut Parser, expresion: Box<dyn Expression>) -> Option<Box<dyn Expression>>;
+    fn(p: &mut Parser, expresion: Expressions) -> Option<Expressions>;
 
 pub struct Parser {
     lexer: Lexer,
@@ -157,7 +157,7 @@ impl Parser {
         self.register_prefix(Token::Function.token_type(), Parser::parse_function_literal);
     }
 
-    fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
+    fn parse_statement(&mut self) -> Option<Statements> {
         let curr_token = &self.curr_token;
         match curr_token {
             Some(Token::Let) => self.parse_let_statement(),
@@ -167,7 +167,7 @@ impl Parser {
         }
     }
 
-    fn parse_return_statement(&mut self) -> Option<Box<dyn Statement>> {
+    fn parse_return_statement(&mut self) -> Option<Statements> {
         let return_token = self.curr_token.clone();
         if return_token.is_none() {
             return None;
@@ -181,7 +181,7 @@ impl Parser {
         Some(Box::new(ReturnStatement::new(return_token, return_value)))
     }
 
-    fn parse_let_statement(&mut self) -> Option<Box<dyn Statement>> {
+    fn parse_let_statement(&mut self) -> Option<Statements> {
         let let_token = self.curr_token.clone()?;
         if !self.expect_peek(Token::Ident("".into())) {
             return None;
@@ -235,7 +235,7 @@ impl Parser {
         self.infix_parse_fns.insert(token_type, func);
     }
 
-    fn parse_expression_statement(&mut self) -> Option<Box<dyn Statement>> {
+    fn parse_expression_statement(&mut self) -> Option<Statements> {
         let expression = self.parse_expression(Priority::Lowest)?;
 
         let stmt = ExpressionStatement::new(self.curr_token.take()?, expression);
@@ -246,7 +246,7 @@ impl Parser {
         Some(Box::new(stmt))
     }
 
-    fn parse_expression(&mut self, precedence: Priority) -> Option<Box<dyn Expression>> {
+    fn parse_expression(&mut self, precedence: Priority) -> Option<Expressions> {
         if self.curr_token.is_none() {
             return None;
         }
@@ -270,7 +270,7 @@ impl Parser {
         left_exp
     }
 
-    fn parse_if_expression(&mut self) -> Option<Box<dyn Expression>> {
+    fn parse_if_expression(&mut self) -> Option<Expressions> {
         match self.expect_peek(Token::Lparen) {
             true => {
                 let curr_token = self.curr_token.clone()?;
@@ -317,7 +317,7 @@ impl Parser {
         Some(BlockStatement::new(curr_token, v))
     }
 
-    fn parse_grouped_expression(&mut self) -> Option<Box<dyn Expression>> {
+    fn parse_grouped_expression(&mut self) -> Option<Expressions> {
         self.next_token();
         let exp = self.parse_expression(Priority::Lowest)?;
         match self.expect_peek(Token::Rparen) {
@@ -326,13 +326,13 @@ impl Parser {
         }
     }
 
-    fn parse_identifier(&mut self) -> Option<Box<dyn Expression>> {
+    fn parse_identifier(&mut self) -> Option<Expressions> {
         let tok = self.curr_token.as_ref()?;
         let literal = tok.literal();
         Some(Box::new(Identifier::new(tok.clone(), literal.into())))
     }
 
-    fn parse_integer_literal(&mut self) -> Option<Box<dyn Expression>> {
+    fn parse_integer_literal(&mut self) -> Option<Expressions> {
         let tok = self.curr_token.as_ref()?;
         let literal = tok
             .literal()
@@ -341,12 +341,12 @@ impl Parser {
         Some(Box::new(IntegerLiteral::new(tok.clone(), literal)))
     }
 
-    fn parse_boolean(&mut self) -> Option<Box<dyn Expression>> {
+    fn parse_boolean(&mut self) -> Option<Expressions> {
         let tok = self.curr_token.as_ref()?;
         let literal = tok.literal().parse::<bool>().expect("type was not a bool");
         Some(Box::new(BooleanLiteral::new(tok.clone(), literal)))
     }
-    fn parse_prefix_expression(&mut self) -> Option<Box<dyn Expression>> {
+    fn parse_prefix_expression(&mut self) -> Option<Expressions> {
         let tok = self.curr_token.as_ref()?.clone();
         let literal = String::from(tok.literal());
         self.next_token();
@@ -360,8 +360,8 @@ impl Parser {
 
     fn parse_infix_expression(
         &mut self,
-        expression_left: Box<dyn Expression>,
-    ) -> Option<Box<dyn Expression>> {
+        expression_left: Expressions,
+    ) -> Option<Expressions> {
         let tok = self.curr_token.as_ref()?.clone();
         let operator = String::from(tok.literal());
         let precedence = self.curr_precedence();
@@ -375,7 +375,7 @@ impl Parser {
         )))
     }
 
-    fn parse_function_literal(&mut self) -> Option<Box<dyn Expression>> {
+    fn parse_function_literal(&mut self) -> Option<Expressions> {
         let tok = self.curr_token.as_ref()?.clone();
         if !self.expect_peek(Token::Lparen) {
             return None;
@@ -417,14 +417,14 @@ impl Parser {
 
     fn parse_call_expression(
         &mut self,
-        function: Box<dyn Expression>,
-    ) -> Option<Box<dyn Expression>> {
+        function: Expressions,
+    ) -> Option<Expressions> {
         let tok = self.curr_token.clone()?;
         let args = self.parse_call_arguments()?;
         Some(Box::new(CallExpression::new(tok, function, args)))
     }
 
-    fn parse_call_arguments(&mut self) -> Option<Vec<Box<dyn Expression>>> {
+    fn parse_call_arguments(&mut self) -> Option<Vec<Expressions>> {
         let mut v = Vec::new();
         if self.peek_token == Some(Token::Rparen) {
             self.next_token();
@@ -460,7 +460,7 @@ mod tests {
     use crate::ast::integer_literal::IntegerLiteral;
     use crate::ast::let_statement::LetStatement;
     use crate::ast::prefix_expression::PrefixExpression;
-    use crate::ast::{AsAny, CallExpression, FunctionLiteral, Node};
+    use crate::ast::{CallExpression, FunctionLiteral, Node};
 
     enum Types<'a> {
         String(&'a str),
@@ -504,7 +504,7 @@ mod tests {
         assert_eq!(format!("{}", boolean), expression.token_literal());
     }
 
-    fn test_literal(expression: &Box<impl Expression + ?Sized>, value: Types) {
+    fn test_literal(expression: &Expressions, value: Types) {
         match value {
             Types::String(x) => {
                 println!("{}", expression);

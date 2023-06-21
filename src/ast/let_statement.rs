@@ -1,16 +1,16 @@
-use crate::ast::{identifier::Identifier, Expression, Node, Statement, Token};
+use crate::ast::{identifier::Identifier, Node, Statement, Token};
 use std::fmt::Display;
 
-use super::AsAny;
+use super::Expressions;
 
 pub struct LetStatement {
     token: Token,
     name: Identifier,
-    value: Box<dyn Expression>,
+    value: Expressions,
 }
 
 impl LetStatement {
-    pub fn new(token: Token, name: Identifier, value: Box<dyn Expression>) -> Self {
+    pub fn new(token: Token, name: Identifier, value: Expressions) -> Self {
         LetStatement { token, name, value }
     }
     pub fn token(&self) -> &Token {
@@ -21,7 +21,7 @@ impl LetStatement {
         &self.name
     }
 
-    pub fn value(&self) -> &Box<dyn Expression> {
+    pub fn value(&self) -> &Expressions {
         &self.value
     }
 }
@@ -39,11 +39,6 @@ impl Display for LetStatement {
     }
 }
 
-impl AsAny for LetStatement {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
 impl Statement for LetStatement {
     fn statement_node(&self) {
         todo!()

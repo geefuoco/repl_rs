@@ -1,7 +1,6 @@
 use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
-use super::AsAny;
 #[derive(Clone)]
 pub struct Identifier {
     token: Token,
@@ -26,12 +25,6 @@ impl Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value())?;
         Ok(())
-    }
-}
-
-impl AsAny for Identifier {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

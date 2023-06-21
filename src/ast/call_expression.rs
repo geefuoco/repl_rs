@@ -1,30 +1,30 @@
-use super::{AsAny, Identifier};
-use crate::ast::{BlockStatement, Expression, Node, Token};
+use super::Expressions;
+use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
 pub struct CallExpression {
     token: Token,
-    function: Box<dyn Expression>,
-    arguments: Vec<Box<dyn Expression>>,
+    function: Expressions,
+    arguments: Vec<Expressions>,
 }
 
 impl CallExpression {
-    pub fn new(token: Token, function: Box<dyn Expression>, arguments: Vec<Box<dyn Expression>>) -> Self {
-        Self{
+    pub fn new(token: Token, function: Expressions, arguments: Vec<Expressions>) -> Self {
+        Self {
             token,
             function,
-            arguments
+            arguments,
         }
     }
     pub fn token(&self) -> &Token {
         &self.token
     }
 
-    pub fn function(&self) -> &dyn Expression {
+    pub fn function(&self) -> &Expressions {
         self.function.as_ref()
     }
 
-    pub fn arguments(&self) -> &Vec<Box<dyn Expression>> {
+    pub fn arguments(&self) -> &[Expressions] {
         self.arguments.as_ref()
     }
 }
@@ -41,19 +41,13 @@ impl Node for CallExpression {
     }
 }
 
-impl AsAny for CallExpression {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
-
 impl Display for CallExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}(", self.function.token_literal())?;
         let n = self.arguments.len();
-        for (i, param) in self.arguments().iter().enumerate(){
+        for (i, param) in self.arguments().iter().enumerate() {
             write!(f, "{}", param)?;
-            if i < n-1 {
+            if i < n - 1 {
                 write!(f, ", ")?;
             }
         }

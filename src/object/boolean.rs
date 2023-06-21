@@ -1,6 +1,4 @@
-use crate::ast::AsAny;
-
-use super::{Object, ObjectType, ObjectTypes};
+use super::{Object, ObjectType};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Boolean {
@@ -19,19 +17,10 @@ impl Boolean {
 
 impl Object for Boolean {
     fn obj_type(&self) -> ObjectType {
-        ObjectTypes::BOOLEAN
+        "BOOLEAN".into()
     }
 
     fn inspect(&self) -> String {
         format!("{}", self.value)
-    }
-
-    fn clone_self(&self) -> Box<dyn Object> {
-        Box::new(self.clone())
-    }
-}
-impl AsAny for Boolean {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }

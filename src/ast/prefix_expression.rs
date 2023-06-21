@@ -1,16 +1,16 @@
 use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
-use super::AsAny;
+use super::Expressions;
 
 pub struct PrefixExpression {
     token: Token,
     operator: String,
-    expression_right: Box<dyn Expression>,
+    expression_right: Expressions,
 }
 
 impl PrefixExpression {
-    pub fn new(token: Token, operator: String, expression_right: Box<dyn Expression>) -> Self {
+    pub fn new(token: Token, operator: String, expression_right: Expressions) -> Self {
         Self {
             token,
             operator,
@@ -25,14 +25,8 @@ impl PrefixExpression {
         &self.operator
     }
 
-    pub fn expression_right(&self) -> &Box<dyn Expression> {
+    pub fn expression_right(&self) -> &Expressions {
         &self.expression_right
-    }
-}
-
-impl AsAny for PrefixExpression {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

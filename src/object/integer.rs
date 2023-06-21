@@ -1,6 +1,4 @@
-use crate::ast::AsAny;
-
-use super::{Object, ObjectTypes};
+use super::Object;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Integer {
@@ -19,18 +17,10 @@ impl Integer {
 
 impl Object for Integer {
     fn obj_type(&self) -> super::ObjectType {
-        ObjectTypes::INTEGER
+        "INTEGER".into()
     }
 
     fn inspect(&self) -> String {
         format!("{}", self.value)
-    }
-    fn clone_self(&self) -> Box<dyn Object> {
-        Box::new(self.clone())
-    }
-}
-impl AsAny for Integer {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }

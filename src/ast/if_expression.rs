@@ -1,4 +1,4 @@
-use super::{AsAny, OptionalBlockStatement, Statement};
+use super::{Expressions, OptionalBlockStatement};
 use crate::ast::{block_statement::BlockStatement, Expression, Node, Token};
 use std::fmt::Display;
 
@@ -6,13 +6,14 @@ pub struct IfExpression {
     token: Token,
     condition: Box<dyn Expression>,
     consequence: BlockStatement,
+    //The wrapper for option is here to allow for impl display block
     alternative: OptionalBlockStatement<BlockStatement>,
 }
 
 impl IfExpression {
     pub fn new(
         token: Token,
-        condition: Box<dyn Expression>,
+        condition: Expressions,
         consequence: BlockStatement,
         alternative: OptionalBlockStatement<BlockStatement>,
     ) -> Self {
@@ -57,12 +58,6 @@ impl Display for IfExpression {
             write!(f, " else {{ {} }}", self.alternative)?;
         }
         Ok(())
-    }
-}
-
-impl AsAny for IfExpression {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

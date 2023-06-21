@@ -1,5 +1,4 @@
 use crate::lexer::Token;
-use std::any::Any;
 use std::fmt::{Debug, Display};
 
 pub mod block_statement;
@@ -28,15 +27,29 @@ pub use let_statement::LetStatement;
 pub use prefix_expression::PrefixExpression;
 pub use return_statement::ReturnStatement;
 
-pub trait AsAny: Any {
-    fn as_any(&self) -> &dyn Any;
+pub enum Expressions {
+    Identifier(Identifier),
+    BooleanLiteral(BooleanLiteral),
+    IntegerLiteral(IntegerLiteral),
+    IfExpression(IfExpression),
+    InfixExpression(InfixExpression),
+    PrefixExpression(PrefixExpression),
+    CallExpression(CallExpression),
+    FunctionLiteral(FunctionLiteral),
+}
+
+pub enum Statements {
+    LetStatement(LetStatement),
+    ReturnStatement(ReturnStatement),
+    ExpressionStatement(ExpressionStatement),
+    BlockStatement(BlockStatement),
 }
 
 pub trait Node: Display {
     fn token_literal(&self) -> &str;
 }
 
-pub trait Statement: Node + AsAny {
+pub trait Statement: Node {
     fn statement_node(&self);
 }
 
@@ -46,7 +59,7 @@ impl Debug for dyn Statement {
     }
 }
 
-pub trait Expression: Node + AsAny {
+pub trait Expression: Node{
     fn expression_node(&self);
 }
 
@@ -79,11 +92,6 @@ impl Node for Program {
     }
 }
 
-impl AsAny for Program {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
 
 pub struct OptionalBlockStatement<T>(Option<T>);
 

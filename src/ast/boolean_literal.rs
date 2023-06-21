@@ -1,7 +1,6 @@
 use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
-use super::AsAny;
 pub struct BooleanLiteral {
     token: Token,
     value: bool,
@@ -25,12 +24,6 @@ impl Display for BooleanLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.token_literal())?;
         Ok(())
-    }
-}
-
-impl AsAny for BooleanLiteral {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

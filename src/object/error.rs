@@ -1,6 +1,4 @@
-use crate::ast::AsAny;
-
-use super::{Object, ObjectType, ObjectTypes};
+use super::{Object, ObjectType};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Error {
@@ -19,18 +17,10 @@ impl Error {
 
 impl Object for Error {
     fn obj_type(&self) -> ObjectType {
-        ObjectTypes::ERROR
+        "ERROR".into()
     }
 
     fn inspect(&self) -> String {
         format!("{}", self.message)
-    }
-    fn clone_self(&self) -> Box<dyn Object> {
-        Box::new(self.clone())
-    }
-}
-impl AsAny for Error {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }

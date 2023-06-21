@@ -1,7 +1,6 @@
 use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
-use super::AsAny;
 pub struct IntegerLiteral {
     token: Token,
     value: isize,
@@ -25,12 +24,6 @@ impl Display for IntegerLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value())?;
         Ok(())
-    }
-}
-
-impl AsAny for IntegerLiteral {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

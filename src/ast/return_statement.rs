@@ -1,15 +1,15 @@
-use crate::ast::{identifier::Identifier, Expression, Node, Statement, Token};
+use crate::ast::{Node, Statement, Token};
 use std::fmt::Display;
 
-use super::AsAny;
+use super::Expressions;
 
 pub struct ReturnStatement {
     token: Token,
-    return_value: Box<dyn Expression>,
+    return_value: Expressions,
 }
 
 impl ReturnStatement {
-    pub fn new(token: Token, return_value: Box<dyn Expression>) -> Self {
+    pub fn new(token: Token, return_value: Expressions) -> Self {
         ReturnStatement {
             token,
             return_value,
@@ -20,7 +20,7 @@ impl ReturnStatement {
         &self.token
     }
 
-    pub fn return_value(&self) -> &Box<dyn Expression> {
+    pub fn return_value(&self) -> &Expressions {
         &self.return_value
     }
 }
@@ -35,12 +35,6 @@ impl Display for ReturnStatement {
 impl Node for ReturnStatement {
     fn token_literal(&self) -> &str {
         self.token.literal()
-    }
-}
-
-impl AsAny for ReturnStatement {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

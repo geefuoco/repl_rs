@@ -1,29 +1,23 @@
 use crate::ast::{Expression, Node, Statement, Token};
 use std::fmt::Display;
 
-use super::AsAny;
+use super::Statements;
 
 pub struct BlockStatement {
     token: Token,
-    statements: Vec<Box<dyn Statement>>,
+    statements: Vec<Statements>,
 }
 
 impl BlockStatement {
-    pub fn new(token: Token, statements: Vec<Box<dyn Statement>>) -> Self {
+    pub fn new(token: Token, statements: Vec<Statements>) -> Self {
         Self { token, statements }
     }
     pub fn token(&self) -> &Token {
         &self.token
     }
 
-    pub fn statements(&self) -> &Vec<Box<dyn Statement>> {
+    pub fn statements(&self) -> &[Statements] {
         &self.statements
-    }
-}
-
-impl AsAny for BlockStatement {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

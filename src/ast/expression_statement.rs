@@ -1,29 +1,21 @@
-use crate::ast::{Expression, Node, Statement, Token};
+use crate::ast::{Expressions, Node, Statement, Token};
 use std::fmt::Display;
-
-use super::AsAny;
 
 pub struct ExpressionStatement {
     token: Token,
-    expression: Box<dyn Expression>,
+    expression: Expressions,
 }
 
 impl ExpressionStatement {
-    pub fn new(token: Token, expression: Box<dyn Expression>) -> Self {
+    pub fn new(token: Token, expression: Expressions) -> Self {
         Self { token, expression }
     }
     pub fn token(&self) -> &Token {
         &self.token
     }
 
-    pub fn expression(&self) -> &Box<dyn Expression> {
+    pub fn expression(&self) -> &Expressions {
         &self.expression
-    }
-}
-
-impl AsAny for ExpressionStatement {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

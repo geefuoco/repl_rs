@@ -1,21 +1,21 @@
 use crate::ast::{Expression, Node, Token};
-use std::{borrow::Borrow, fmt::Display};
+use std::fmt::Display;
 
-use super::AsAny;
+use super::Expressions;
 
 pub struct InfixExpression {
     token: Token,
     operator: String,
-    expression_left: Box<dyn Expression>,
-    expression_right: Box<dyn Expression>,
+    expression_left: Expressions,
+    expression_right: Expressions,
 }
 
 impl InfixExpression {
     pub fn new(
         token: Token,
         operator: String,
-        expression_left: Box<dyn Expression>,
-        expression_right: Box<dyn Expression>,
+        expression_left: Expressions,
+        expression_right: Expressions,
     ) -> Self {
         Self {
             token,
@@ -32,11 +32,11 @@ impl InfixExpression {
         &self.operator
     }
 
-    pub fn expression_right(&self) -> &Box<dyn Expression> {
+    pub fn expression_right(&self) -> &Expressions {
         &self.expression_right
     }
 
-    pub fn expression_left(&self) -> &Box<dyn Expression> {
+    pub fn expression_left(&self) -> &Expressions {
         &self.expression_left
     }
 }
@@ -44,12 +44,6 @@ impl InfixExpression {
 impl Expression for InfixExpression {
     fn expression_node(&self) {
         todo!()
-    }
-}
-
-impl AsAny for InfixExpression {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 
