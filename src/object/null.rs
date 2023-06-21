@@ -2,7 +2,7 @@ use crate::ast::AsAny;
 
 use super::{Object, ObjectType, ObjectTypes};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Null {}
 
 impl Object for Null {
@@ -12,6 +12,9 @@ impl Object for Null {
 
     fn inspect(&self) -> String {
         String::from("null")
+    }
+    fn clone_self(&self) -> Box<dyn Object> {
+        Box::new(self.clone())
     }
 }
 

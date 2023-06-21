@@ -2,9 +2,9 @@ use crate::ast::AsAny;
 
 use super::{Object, ObjectType, ObjectTypes};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Return {
-    pub value: Box<dyn Object>,
+    value: Box<dyn Object>,
 }
 
 impl Return {
@@ -24,6 +24,9 @@ impl Object for Return {
 
     fn inspect(&self) -> String {
         format!("{}", self.value.inspect())
+    }
+    fn clone_self(&self) -> Box<dyn Object> {
+        Box::new(self.clone())
     }
 }
 impl AsAny for Return {

@@ -3,6 +3,7 @@ use crate::ast::BlockStatement;
 use crate::ast::BooleanLiteral;
 use crate::ast::Expression;
 use crate::ast::ExpressionStatement;
+use crate::ast::Identifier;
 use crate::ast::IfExpression;
 use crate::ast::InfixExpression;
 use crate::ast::IntegerLiteral;
@@ -13,6 +14,7 @@ use crate::ast::Program;
 use crate::ast::ReturnStatement;
 use crate::ast::Statement;
 use crate::object::Boolean;
+use crate::object::Environment;
 use crate::object::ErrorObject;
 use crate::object::Integer;
 use crate::object::Null;
@@ -61,10 +63,19 @@ fn safely_downcast_expression<T: 'static>(node: &Box<dyn Expression>) -> &T {
         .expect("Could not safely downcast")
 }
 
-fn eval_block_statement(block: &BlockStatement) -> Option<Box<dyn Object>> {
+fn eval_identifier(ident: &Identifier, env: &mut Environment) -> Box<dyn Object> {
+    if let Some(obj) = env.get(ident.value().into()) {
+        return obj;
+    } else {
+        return Box::new(ErrorObject::new(format!("identifier not found: {}", ident.value())));
+    }
+
+}
+
+fn eval_block_statement(block: &BlockStatement, env: &mut Environment) -> Option<Box<dyn Object>> {
     let mut final_result: Option<Box<dyn Object>> = None;
     for stmt in block.statements() {
-        let result = eval_statement(stmt)?;
+        let result = eval_statement(stmt, env)?;
 
         if result.obj_type() == ObjectTypes::ERROR {
             return Some(result);
@@ -80,23 +91,28 @@ fn eval_block_statement(block: &BlockStatement) -> Option<Box<dyn Object>> {
     final_result
 }
 
-fn eval_statement(statement: &Box<dyn Statement>) -> Option<Box<dyn Object>> {
+fn eval_statement(statement: &Box<dyn Statement>, env: &mut Environment) -> Option<Box<dyn Object>> {
     let mut result: Option<Box<dyn Object>> = None;
     if eval_helper_statement::<LetStatement>(statement) {
-        todo!()
+        let value = safely_downcast_statement::<LetStatement>(statement);
+        let let_value = eval_expression(value.value(), env);
+        if let_value.is_err() {
+            return Some(let_value);
+        }
+        env.set(value.name().value().into(), let_value);
     } else if eval_helper_statement::<ReturnStatement>(statement) {
         let value = safely_downcast_statement::<ReturnStatement>(statement);
-        let return_value = eval_expression(value.return_value());
+        let return_value = eval_expression(value.return_value(), env);
         if return_value.is_err() {
             return Some(return_value);
         }
         return Some(Box::new(Return::new(return_value)));
     } else if eval_helper_statement::<ExpressionStatement>(statement) {
         let value = safely_downcast_statement::<ExpressionStatement>(statement);
-        result = Some(eval_expression(value.expression()));
+        result = Some(eval_expression(value.expression(), env));
     } else if eval_helper_statement::<BlockStatement>(statement) {
         let value = safely_downcast_statement::<BlockStatement>(statement);
-        let block_statement = eval_block_statement(value)?;
+        let block_statement = eval_block_statement(value, env)?;
         result = Some(block_statement);
     } else {
         unreachable!()
@@ -104,21 +120,27 @@ fn eval_statement(statement: &Box<dyn Statement>) -> Option<Box<dyn Object>> {
     result
 }
 
-fn eval_statements(statements: &Vec<Box<dyn Statement>>) -> Box<dyn Object> {
+fn eval_statements(statements: &[Box<dyn Statement>], env: &mut Environment) -> Box<dyn Object> {
     let mut result: Option<Box<dyn Object>> = None;
     let mut is_err = false;
     for stmt in statements {
         if eval_helper_statement::<LetStatement>(stmt) {
-            todo!()
+            let value = safely_downcast_statement::<LetStatement>(stmt);
+            let let_value = eval_expression(value.value(), env);
+            if let_value.is_err() {
+                println!("Error in let statement");
+                return let_value;
+            }
+            env.set(value.name().value().into(), let_value);
         } else if eval_helper_statement::<ExpressionStatement>(stmt) {
             let value = safely_downcast_statement::<ExpressionStatement>(stmt);
-            result = Some(eval_expression(value.expression()));
+            result = Some(eval_expression(value.expression(), env));
         } else if eval_helper_statement::<BlockStatement>(stmt) {
             let value = safely_downcast_statement::<BlockStatement>(stmt);
-            result = eval_block_statement(value);
+            result = eval_block_statement(value, env);
         } else if eval_helper_statement::<ReturnStatement>(stmt) {
             let value = safely_downcast_statement::<ReturnStatement>(stmt);
-            let return_value = eval_expression(value.return_value());
+            let return_value = eval_expression(value.return_value(), env);
             return return_value;
         } else {
             unreachable!()
@@ -133,7 +155,7 @@ fn eval_statements(statements: &Vec<Box<dyn Statement>>) -> Box<dyn Object> {
     result.expect("Could not evaluate any statements")
 }
 
-fn eval_expression(node: &Box<dyn Expression>) -> Box<dyn Object> {
+fn eval_expression(node: &Box<dyn Expression>, env: &mut Environment) -> Box<dyn Object> {
     if eval_helper_expression::<IntegerLiteral>(node) {
         let value = safely_downcast_expression::<IntegerLiteral>(node);
         return Box::new(Integer::new(*value.value()));
@@ -146,25 +168,28 @@ fn eval_expression(node: &Box<dyn Expression>) -> Box<dyn Object> {
         }
     } else if eval_helper_expression::<PrefixExpression>(node) {
         let value = safely_downcast_expression::<PrefixExpression>(node);
-        let right = eval_expression(value.expression_right());
+        let right = eval_expression(value.expression_right(), env);
         if right.is_err() {
             return right;
         }
         return eval_prefix_expression(value.operator(), &right);
     } else if eval_helper_expression::<InfixExpression>(node) {
         let value = safely_downcast_expression::<InfixExpression>(node);
-        let left = eval_expression(value.expression_left());
+        let left = eval_expression(value.expression_left(), env);
         if left.is_err() {
             return left;
         }
-        let right = eval_expression(value.expression_right());
+        let right = eval_expression(value.expression_right(), env);
         if right.is_err() {
             return right;
         }
         return eval_infix_expression(value.operator(), &left, &right);
     } else if eval_helper_expression::<IfExpression>(node) {
         let value = safely_downcast_expression::<IfExpression>(node);
-        return eval_if_expression(value).expect("could not evaluate if expression");
+        return eval_if_expression(value, env).expect("could not evaluate if expression");
+    } else if eval_helper_expression::<Identifier>(node) {
+        let value = safely_downcast_expression::<Identifier>(node);
+        return eval_identifier(value, env);
     } else {
         return Box::new(NULL);
     }
@@ -262,15 +287,15 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
     }
 }
 
-fn eval_if_expression(exp: &IfExpression) -> Option<Box<dyn Object>> {
-    let condition = eval_expression(exp.condition());
+fn eval_if_expression(exp: &IfExpression, env: &mut Environment) -> Option<Box<dyn Object>> {
+    let condition = eval_expression(exp.condition(), env);
     if condition.is_err() {
         return Some(condition);
     }
     if is_truthy(&condition) {
-        return eval_block_statement(exp.consequence());
+        return eval_block_statement(exp.consequence(), env);
     } else if exp.alternative().is_some() {
-        return eval_block_statement(exp.alternative().as_ref().unwrap());
+        return eval_block_statement(exp.alternative().as_ref().unwrap(), env);
     } else {
         return Some(Box::new(NULL));
     }
@@ -289,10 +314,10 @@ fn is_truthy(obj: &Box<dyn Object>) -> bool {
     }
 }
 
-pub fn eval_program(node: &(impl Node + AsAny)) -> Box<dyn Object> {
+pub fn eval_program(node: &(impl Node + AsAny), env: &mut Environment) -> Box<dyn Object> {
     if eval_helper::<Program>(node) {
         let value = safely_downcast::<Program>(node);
-        return eval_statements(&value.statements);
+        return eval_statements(&value.statements, env);
     } else {
         unreachable!()
     }
@@ -311,14 +336,15 @@ mod test {
         let l = Lexer::new(input.into());
         let mut p = Parser::new(l);
         let program = p.parse_program().expect("Program did not parse properly");
-        eval_program(&program)
+        let mut env = Environment::new();
+        eval_program(&program, &mut env)
     }
 
     fn test_int(obj: &Box<dyn Object>, exp: &isize) {
         let obj = obj
             .as_any()
             .downcast_ref::<Integer>()
-            .expect("Object was not an Integer");
+            .expect(format!("Object was not an Integer. It was a {}", obj.obj_type()).as_str());
         assert_eq!(exp, obj.value());
     }
 
@@ -326,7 +352,7 @@ mod test {
         let obj = obj
             .as_any()
             .downcast_ref::<Boolean>()
-            .expect("Object was not an Boolean");
+            .expect(format!("Object was not an Boolean. It was a {}", obj.obj_type()).as_str());
         assert_eq!(exp, obj.value());
     }
 
@@ -482,6 +508,7 @@ mod test {
                 "if (10 > 1) {if (10 > 1) {false + true;} return 1;}",
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
+            ("foobar", "identifier not found: foobar"),
         ];
 
         for (s, exp) in inputs {
@@ -491,6 +518,22 @@ mod test {
                 .downcast_ref::<ErrorObject>()
                 .expect(format!("Could not cast {:?} to error object", &evaluated).as_str());
             assert_eq!(exp, error_obj.message());
+        }
+    }
+
+    #[test]
+    fn eval_let_statements() {
+        let inputs = [
+            ("let a = 5; a; a;", 5),
+            ("let a = 5; a;", 5),
+            ("let a = 5 * 5; a;", 25),
+            ("let a = 5; let b = a; b;", 5),
+            ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
+        ];
+
+        for (s, exp) in inputs {
+            let evaluated = test_eval(s);
+            test_int(&evaluated, &exp);
         }
     }
 }

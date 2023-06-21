@@ -9,11 +9,13 @@ mod error;
 mod integer;
 mod null;
 mod return_object;
+mod environment;
 pub use boolean::Boolean;
 pub use error::Error as ErrorObject;
 pub use integer::Integer;
 pub use null::Null;
 pub use return_object::Return;
+pub use environment::Environment;
 
 type ObjectType = ObjectTypes;
 
@@ -44,6 +46,7 @@ impl Debug for CastError {
 pub trait Object: AsAny + Debug {
     fn obj_type(&self) -> ObjectType;
     fn inspect(&self) -> String;
+    fn clone_self(&self) -> Box<dyn Object>;
     fn as_integer(&self) -> Result<Integer, CastError> {
         match self.inspect().parse::<isize>() {
             Ok(v) => Ok(Integer::new(v)),
@@ -115,6 +118,12 @@ pub trait Object: AsAny + Debug {
             ObjectTypes::ERROR=> true,
             _ => false,
         }
+    }
+}
+
+impl Clone for Box<dyn Object> {
+    fn clone(&self) -> Self {
+        self.clone_self()
     }
 }
 

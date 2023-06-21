@@ -2,6 +2,7 @@ use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
 use super::AsAny;
+#[derive(Clone)]
 pub struct Identifier {
     token: Token,
     value: String,

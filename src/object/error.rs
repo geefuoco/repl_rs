@@ -4,12 +4,12 @@ use super::{Object, ObjectType, ObjectTypes};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Error {
-    message: String
+    message: String,
 }
 
 impl Error {
-    pub fn new(message: String) -> Self{
-        Self{message}
+    pub fn new(message: String) -> Self {
+        Self { message }
     }
 
     pub fn message(&self) -> &str {
@@ -24,6 +24,9 @@ impl Object for Error {
 
     fn inspect(&self) -> String {
         format!("{}", self.message)
+    }
+    fn clone_self(&self) -> Box<dyn Object> {
+        Box::new(self.clone())
     }
 }
 impl AsAny for Error {

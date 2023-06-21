@@ -2,7 +2,7 @@ use crate::ast::AsAny;
 
 use super::{Object, ObjectTypes};
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Integer {
     value: isize,
 }
@@ -24,6 +24,9 @@ impl Object for Integer {
 
     fn inspect(&self) -> String {
         format!("{}", self.value)
+    }
+    fn clone_self(&self) -> Box<dyn Object> {
+        Box::new(self.clone())
     }
 }
 impl AsAny for Integer {
