@@ -17,7 +17,9 @@ pub fn start() -> Result<(), Box<dyn std::error::Error>> {
                 match program {
                     Ok(program) => {
                         let evaluated = evaluator::eval_program(&program, &mut env);
-                        println!("{}", evaluated.inspect());
+                        if let Some(evaluated) = evaluated {
+                            println!("{}", evaluated.inspect());
+                        }
                     }
                     Err(_) => {
                         for e in parser.errors() {

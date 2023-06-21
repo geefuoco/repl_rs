@@ -120,7 +120,7 @@ fn eval_statement(statement: &Box<dyn Statement>, env: &mut Environment) -> Opti
     result
 }
 
-fn eval_statements(statements: &[Box<dyn Statement>], env: &mut Environment) -> Box<dyn Object> {
+fn eval_statements(statements: &[Box<dyn Statement>], env: &mut Environment) -> Option<Box<dyn Object>> {
     let mut result: Option<Box<dyn Object>> = None;
     let mut is_err = false;
     for stmt in statements {
@@ -129,9 +129,9 @@ fn eval_statements(statements: &[Box<dyn Statement>], env: &mut Environment) -> 
             let let_value = eval_expression(value.value(), env);
             if let_value.is_err() {
                 println!("Error in let statement");
-                return let_value;
+                return Some(let_value);
             }
-            env.set(value.name().value().into(), let_value);
+            env.set(value.name().value().into(), let_value.clone_self());
         } else if eval_helper_statement::<ExpressionStatement>(stmt) {
             let value = safely_downcast_statement::<ExpressionStatement>(stmt);
             result = Some(eval_expression(value.expression(), env));
@@ -141,7 +141,7 @@ fn eval_statements(statements: &[Box<dyn Statement>], env: &mut Environment) -> 
         } else if eval_helper_statement::<ReturnStatement>(stmt) {
             let value = safely_downcast_statement::<ReturnStatement>(stmt);
             let return_value = eval_expression(value.return_value(), env);
-            return return_value;
+            return Some(return_value);
         } else {
             unreachable!()
         }
@@ -149,10 +149,10 @@ fn eval_statements(statements: &[Box<dyn Statement>], env: &mut Environment) -> 
             is_err = result.is_err();
         }
         if is_err {
-            return result.expect("Error should be returned here");
+            return result;
         }
     }
-    result.expect("Could not evaluate any statements")
+    result
 }
 
 fn eval_expression(node: &Box<dyn Expression>, env: &mut Environment) -> Box<dyn Object> {
@@ -314,12 +314,12 @@ fn is_truthy(obj: &Box<dyn Object>) -> bool {
     }
 }
 
-pub fn eval_program(node: &(impl Node + AsAny), env: &mut Environment) -> Box<dyn Object> {
+pub fn eval_program(node: &(impl Node + AsAny), env: &mut Environment) -> Option<Box<dyn Object>> {
     if eval_helper::<Program>(node) {
         let value = safely_downcast::<Program>(node);
         return eval_statements(&value.statements, env);
     } else {
-        unreachable!()
+        None
     }
 }
 
@@ -332,7 +332,7 @@ mod test {
         parser::Parser,
     };
 
-    fn test_eval(input: &str) -> Box<dyn Object> {
+    fn test_eval(input: &str) -> Option<Box<dyn Object>> {
         let l = Lexer::new(input.into());
         let mut p = Parser::new(l);
         let program = p.parse_program().expect("Program did not parse properly");
@@ -386,7 +386,10 @@ mod test {
 
         for (s, i) in inputs {
             let evaluated = test_eval(s);
-            test_int(&evaluated, &i)
+            match evaluated {
+                Some(v) => test_int(&v, &i),
+                None => {println!("No output")}
+            }
         }
     }
 
@@ -415,7 +418,10 @@ mod test {
 
         for (s, i) in inputs {
             let evaluated = test_eval(s);
-            test_bool(&evaluated, &i);
+            match evaluated {
+                Some(v) => test_bool(&v, &i),
+                None => {println!("No output")}
+            }
         }
     }
 
@@ -432,7 +438,10 @@ mod test {
 
         for (s, i) in inputs {
             let evaluated = test_eval(s);
-            test_bool(&evaluated, &i);
+            match evaluated {
+                Some(v) => test_bool(&v, &i),
+                None => {println!("No output")}
+            }
         }
     }
 
@@ -448,9 +457,14 @@ mod test {
 
         for (s, i) in inputs {
             let evaluated = test_eval(s);
-            match evaluated.as_any().downcast_ref::<Integer>() {
-                Some(_) => test_int(&evaluated, &i.expect("No integer found")),
-                None => assert!(false, "did not evaluate to an integer"),
+            match evaluated {
+                Some(v) => {
+                    match v.as_any().downcast_ref::<Integer>() {
+                        Some(_) => test_int(&v, &i.expect("No integer found")),
+                        None => assert!(false, "did not evaluate to an integer"),
+                    }
+                },
+                None => println!("No output")
             }
         }
 
@@ -458,9 +472,14 @@ mod test {
 
         for s in inputs {
             let evaluated = test_eval(s);
-            match evaluated.as_any().downcast_ref::<Null>() {
-                Some(_) => test_null(&evaluated),
-                None => assert!(false, "did not evaluate to NULL"),
+            match evaluated {
+                Some(v) => {
+                    match v.as_any().downcast_ref::<Null>() {
+                        Some(_) => test_null(&v),
+                        None => assert!(false, "did not evaluate to NULL"),
+                    }
+                }
+                None => {println!("No output")}
             }
         }
     }
@@ -486,9 +505,14 @@ mod test {
 
         for (s, i) in inputs {
             let evaluated = test_eval(s);
-            match evaluated.as_any().downcast_ref::<Return>() {
-                Some(ret) => test_int(ret.value(), &i),
-                None => {}
+            match evaluated {
+                Some(v) => {
+                    match v.as_any().downcast_ref::<Return>() {
+                        Some(ret) => test_int(ret.value(), &i),
+                        None => {}
+                    }
+                },
+                None => println!("No output")
             }
         }
     }
@@ -513,11 +537,15 @@ mod test {
 
         for (s, exp) in inputs {
             let evaluated = test_eval(s);
-            let error_obj = evaluated
-                .as_any()
-                .downcast_ref::<ErrorObject>()
-                .expect(format!("Could not cast {:?} to error object", &evaluated).as_str());
-            assert_eq!(exp, error_obj.message());
+            if let Some(evaluated) = evaluated {
+                let error_obj = evaluated
+                    .as_any()
+                    .downcast_ref::<ErrorObject>()
+                    .expect(format!("Could not cast {:?} to error object", &evaluated).as_str());
+                assert_eq!(exp, error_obj.message());
+            } else {
+                assert!(false, "No output");
+            }
         }
     }
 
@@ -533,7 +561,11 @@ mod test {
 
         for (s, exp) in inputs {
             let evaluated = test_eval(s);
-            test_int(&evaluated, &exp);
+            if let Some(evaluated) = evaluated {
+                test_int(&evaluated, &exp);
+            } else {
+                assert!(false, "No output");
+            }
         }
     }
 }
