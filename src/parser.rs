@@ -30,8 +30,7 @@ enum Priority {
 }
 
 type PrefixParseFn = fn(p: &mut Parser) -> Option<Expressions>;
-type InfixParseFn =
-    fn(p: &mut Parser, expresion: Expressions) -> Option<Expressions>;
+type InfixParseFn = fn(p: &mut Parser, expresion: Expressions) -> Option<Expressions>;
 
 pub struct Parser {
     lexer: Lexer,
@@ -178,7 +177,10 @@ impl Parser {
         if self.peek_token == Some(Token::Semicolon) {
             self.next_token();
         }
-        Some(Box::new(ReturnStatement::new(return_token, return_value)))
+        Some(Statements::ReturnStatement(ReturnStatement::new(
+            return_token,
+            return_value,
+        )))
     }
 
     fn parse_let_statement(&mut self) -> Option<Statements> {
@@ -201,7 +203,9 @@ impl Parser {
         if self.peek_token == Some(Token::Semicolon) {
             self.next_token();
         }
-        Some(Box::new(LetStatement::new(let_token, ident, value)))
+        Some(Statements::LetStatement(LetStatement::new(
+            let_token, ident, value,
+        )))
     }
 
     fn expect_peek(&mut self, token_type: Token) -> bool {
@@ -243,7 +247,7 @@ impl Parser {
         if self.peek_token == Some(Token::Semicolon) {
             self.next_token();
         };
-        Some(Box::new(stmt))
+        Some(Statements::ExpressionStatement(stmt))
     }
 
     fn parse_expression(&mut self, precedence: Priority) -> Option<Expressions> {
@@ -291,7 +295,7 @@ impl Parser {
                     }
                     alternative = OptionalBlockStatement::new(Some(self.parse_block_statement()?));
                 }
-                Some(Box::new(IfExpression::new(
+                Some(Expressions::IfExpression(IfExpression::new(
                     curr_token,
                     condition,
                     consequence,
@@ -329,7 +333,10 @@ impl Parser {
     fn parse_identifier(&mut self) -> Option<Expressions> {
         let tok = self.curr_token.as_ref()?;
         let literal = tok.literal();
-        Some(Box::new(Identifier::new(tok.clone(), literal.into())))
+        Some(Expressions::Identifier(Identifier::new(
+            tok.clone(),
+            literal.into(),
+        )))
     }
 
     fn parse_integer_literal(&mut self) -> Option<Expressions> {
@@ -338,40 +345,38 @@ impl Parser {
             .literal()
             .parse::<isize>()
             .expect("Type was not a number");
-        Some(Box::new(IntegerLiteral::new(tok.clone(), literal)))
+        Some(Expressions::IntegerLiteral(IntegerLiteral::new(
+            tok.clone(),
+            literal,
+        )))
     }
 
     fn parse_boolean(&mut self) -> Option<Expressions> {
         let tok = self.curr_token.as_ref()?;
         let literal = tok.literal().parse::<bool>().expect("type was not a bool");
-        Some(Box::new(BooleanLiteral::new(tok.clone(), literal)))
+        Some(Expressions::BooleanLiteral(BooleanLiteral::new(
+            tok.clone(),
+            literal,
+        )))
     }
     fn parse_prefix_expression(&mut self) -> Option<Expressions> {
         let tok = self.curr_token.as_ref()?.clone();
         let literal = String::from(tok.literal());
         self.next_token();
         let expression_right = self.parse_expression(Priority::Prefix)?;
-        Some(Box::new(PrefixExpression::new(
-            tok,
-            literal,
-            expression_right,
+        Some(Expressions::PrefixExpression(Box::new(
+            PrefixExpression::new(tok, literal, expression_right),
         )))
     }
 
-    fn parse_infix_expression(
-        &mut self,
-        expression_left: Expressions,
-    ) -> Option<Expressions> {
+    fn parse_infix_expression(&mut self, expression_left: Expressions) -> Option<Expressions> {
         let tok = self.curr_token.as_ref()?.clone();
         let operator = String::from(tok.literal());
         let precedence = self.curr_precedence();
         self.next_token();
         let expression_right = self.parse_expression(precedence)?;
-        Some(Box::new(InfixExpression::new(
-            tok,
-            operator,
-            expression_left,
-            expression_right,
+        Some(Expressions::InfixExpression(Box::new(
+            InfixExpression::new(tok, operator, expression_left, expression_right),
         )))
     }
 
@@ -385,7 +390,9 @@ impl Parser {
             return None;
         }
         let body = self.parse_block_statement()?;
-        Some(Box::new(FunctionLiteral::new(tok, parameters, body)))
+        Some(Expressions::FunctionLiteral(FunctionLiteral::new(
+            tok, parameters, body,
+        )))
     }
 
     fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
@@ -415,13 +422,12 @@ impl Parser {
         Some(v)
     }
 
-    fn parse_call_expression(
-        &mut self,
-        function: Expressions,
-    ) -> Option<Expressions> {
+    fn parse_call_expression(&mut self, function: Expressions) -> Option<Expressions> {
         let tok = self.curr_token.clone()?;
         let args = self.parse_call_arguments()?;
-        Some(Box::new(CallExpression::new(tok, function, args)))
+        Some(Expressions::CallExpression(Box::new(CallExpression::new(
+            tok, function, args,
+        ))))
     }
 
     fn parse_call_arguments(&mut self) -> Option<Vec<Expressions>> {
@@ -452,15 +458,11 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::block_statement::BlockStatement;
     use crate::ast::boolean_literal::BooleanLiteral;
-    use crate::ast::expression_statement::ExpressionStatement;
-    use crate::ast::if_expression::IfExpression;
     use crate::ast::infix_expression::InfixExpression;
     use crate::ast::integer_literal::IntegerLiteral;
     use crate::ast::let_statement::LetStatement;
-    use crate::ast::prefix_expression::PrefixExpression;
-    use crate::ast::{CallExpression, FunctionLiteral, Node};
+    use crate::ast::Node;
 
     enum Types<'a> {
         String(&'a str),
@@ -504,52 +506,43 @@ mod tests {
         assert_eq!(format!("{}", boolean), expression.token_literal());
     }
 
-    fn test_literal(expression: &Expressions, value: Types) {
+    fn test_literal(expression: Expressions, value: Types) {
         match value {
             Types::String(x) => {
-                println!("{}", expression);
-                let expression = match expression.as_any().downcast_ref::<Identifier>() {
+                let expression = match expression.as_identifier() {
                     Some(v) => v,
                     None => panic!("Could not convert expression to Identifier"),
                 };
-                test_ident(expression, &x);
+                test_ident(&expression, &x);
             }
             Types::Isize(x) => {
-                println!("{}", expression);
-                let expression = match expression.as_any().downcast_ref::<IntegerLiteral>() {
+                let expression = match expression.as_integer_literal() {
                     Some(v) => v,
                     None => panic!("Could not convert expression to IntegerLiteral"),
                 };
-                test_integer(expression, x);
+                test_integer(&expression, x);
             }
             Types::Bool(x) => {
-                println!("{}", expression);
-                let expression = match expression.as_any().downcast_ref::<BooleanLiteral>() {
+                let expression = match expression.as_boolean_literal() {
                     Some(v) => v,
                     None => panic!("Could not convert expression to BooleanLiteral"),
                 };
-                test_bool(expression, x);
+                test_bool(&expression, x);
             }
         }
     }
 
     fn test_infix_expression(expression: &InfixExpression, left: Types, op: &str, right: Types) {
         match left {
-            Types::String(x) => test_literal(expression.expression_left(), Types::String(x)),
-            Types::Isize(x) => test_literal(expression.expression_left(), Types::Isize(x)),
-            Types::Bool(x) => test_literal(expression.expression_left(), Types::Bool(x)),
+            Types::String(x) => test_literal(expression.expression_left().clone(), Types::String(x)),
+            Types::Isize(x) => test_literal(expression.expression_left().clone(), Types::Isize(x)),
+            Types::Bool(x) => test_literal(expression.expression_left().clone(), Types::Bool(x)),
         }
         match right {
-            Types::String(x) => test_literal(expression.expression_right(), Types::String(x)),
-            Types::Isize(x) => test_literal(expression.expression_right(), Types::Isize(x)),
-            Types::Bool(x) => test_literal(expression.expression_right(), Types::Bool(x)),
+            Types::String(x) => test_literal(expression.expression_right().clone(), Types::String(x)),
+            Types::Isize(x) => test_literal(expression.expression_right().clone(), Types::Isize(x)),
+            Types::Bool(x) => test_literal(expression.expression_right().clone(), Types::Bool(x)),
         }
-
-        let expression = match expression.as_any().downcast_ref::<InfixExpression>() {
-            Some(v) => v,
-            None => panic!("Could not convert expression to InfixExpression"),
-        };
-
         assert_eq!(expression.operator(), op);
     }
 
@@ -561,9 +554,9 @@ mod tests {
             }
         }
         match value {
-            Types::String(x) => test_literal(return_statement.return_value(), Types::String(x)),
-            Types::Isize(x) => test_literal(return_statement.return_value(), Types::Isize(x)),
-            Types::Bool(x) => test_literal(return_statement.return_value(), Types::Bool(x)),
+            Types::String(x) => test_literal(return_statement.return_value().clone(), Types::String(x)),
+            Types::Isize(x) => test_literal(return_statement.return_value().clone(), Types::Isize(x)),
+            Types::Bool(x) => test_literal(return_statement.return_value().clone(), Types::Bool(x)),
         }
     }
     fn test_let_statement(let_statement: &LetStatement, identifier: Types, value: Types) {
@@ -574,20 +567,19 @@ mod tests {
             }
         }
         match value {
-            Types::String(x) => test_literal(let_statement.value(), Types::String(x)),
-            Types::Isize(x) => test_literal(let_statement.value(), Types::Isize(x)),
-            Types::Bool(x) => test_literal(let_statement.value(), Types::Bool(x)),
+            Types::String(x) => test_literal(let_statement.value().clone(), Types::String(x)),
+            Types::Isize(x) => test_literal(let_statement.value().clone(), Types::Isize(x)),
+            Types::Bool(x) => test_literal(let_statement.value().clone(), Types::Bool(x)),
         }
     }
 
     #[test]
     fn test_let_with_func() {
         let input = "let x = fn(x, y) {x + y};";
-        let program = test_helper(input);
-        let statement = program.statements.get(0).unwrap();
+        let mut program = test_helper(input);
+        let statement = program.statements.remove(0);
         let let_statement = statement
-            .as_any()
-            .downcast_ref::<LetStatement>()
+            .as_let_statement()
             .expect("statement was not LetStatement");
         assert_eq!("x", let_statement.name().token_literal());
         assert_eq!("fn(x, y) { (x + y) }", format!("{}", let_statement.value()));
@@ -598,18 +590,21 @@ mod tests {
         let exp = &InfixExpression::new(
             Token::Integer(String::from("5")),
             String::from("+"),
-            Box::new(IntegerLiteral::new(Token::Integer(String::from("5")), 5)),
-            Box::new(IntegerLiteral::new(Token::Integer(String::from("10")), 10)),
+            Expressions::IntegerLiteral(IntegerLiteral::new(Token::Integer(String::from("5")), 5)),
+            Expressions::IntegerLiteral(IntegerLiteral::new(
+                Token::Integer(String::from("10")),
+                10,
+            )),
         );
         test_infix_expression(exp, Types::Isize(5), "+", Types::Isize(10));
         let binding = &InfixExpression::new(
             Token::Ident(String::from("foo")),
             String::from("*"),
-            Box::new(Identifier::new(
+            Expressions::Identifier(Identifier::new(
                 Token::Ident(String::from("foo")),
                 "foo".into(),
             )),
-            Box::new(Identifier::new(
+            Expressions::Identifier(Identifier::new(
                 Token::Ident(String::from("bar")),
                 "bar".into(),
             )),
@@ -631,11 +626,10 @@ mod tests {
         ];
 
         for (input, left, right) in inputs {
-            let program = test_helper(input);
-            let statement = program.statements.get(0).unwrap();
+            let mut program = test_helper(input);
+            let statement = program.statements.remove(0);
             let let_statement = statement
-                .as_any()
-                .downcast_ref::<LetStatement>()
+                .as_let_statement()
                 .expect("statement was not LetStatement");
             test_let_statement(&let_statement, left, right)
         }
@@ -654,13 +648,12 @@ mod tests {
         ];
 
         for (input, left, right) in inputs {
-            let program = test_helper(input);
-            let statement = program.statements.get(0).unwrap();
-            let let_statement = statement
-                .as_any()
-                .downcast_ref::<ReturnStatement>()
+            let mut program = test_helper(input);
+            let statement = program.statements.remove(0);
+            let return_statement = statement
+                .as_return_statement()
                 .expect("statement was not ReturnStatement");
-            test_return_statement(&let_statement, left, right)
+            test_return_statement(&return_statement, left, right)
         }
     }
 
@@ -682,16 +675,15 @@ mod tests {
         let mut program = test_helper(input);
         assert_eq!(1, program.statements.len());
         let statement = program.statements.remove(0);
-        println!("{:?}", statement.type_id());
-        let statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
-            Some(v) => v,
-            None => panic!("Statement was not an expression statement"),
-        };
-        let ident = match statement.expression().as_any().downcast_ref::<Identifier>() {
-            Some(v) => v,
-            None => panic!("Statement was not an identifier"),
-        };
-        test_ident(ident, &input[..input.len() - 1]);
+        let statement = statement
+            .as_expression_statement()
+            .expect("Statement was not an expression statement");
+        let ident = statement
+            .expression()
+            .clone()
+            .as_identifier()
+            .expect("expression was not an identifier");
+        test_ident(&ident, &input[..input.len() - 1]);
     }
 
     #[test]
@@ -700,19 +692,16 @@ mod tests {
         let program = test_helper(input);
         assert_eq!(1, program.statements.len());
         let statement = program.statements.get(0).unwrap();
-        let statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
-            Some(v) => v,
-            None => panic!("Statement was not an expression statement"),
-        };
-        let boolean = match statement
+        let statement = statement
+            .clone()
+            .as_expression_statement()
+            .expect("Statement was not an expression statement");
+        let boolean = statement
             .expression()
-            .as_any()
-            .downcast_ref::<BooleanLiteral>()
-        {
-            Some(v) => v,
-            None => panic!("Statement was not an BooleanLiteral"),
-        };
-        test_bool(boolean, false);
+            .clone()
+            .as_boolean_literal()
+            .expect("expression was not a boolean literal");
+        test_bool(&boolean, false);
     }
 
     #[test]
@@ -721,19 +710,16 @@ mod tests {
         let program = test_helper(input);
         assert_eq!(1, program.statements.len());
         let statement = program.statements.get(0).unwrap();
-        let statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
-            Some(v) => v,
-            None => panic!("Statement was not an expression statement"),
-        };
-        let integer = match statement
+        let statement = statement
+            .clone()
+            .as_expression_statement()
+            .expect("Statement was not an expression statement");
+        let integer = statement
             .expression()
-            .as_any()
-            .downcast_ref::<IntegerLiteral>()
-        {
-            Some(v) => v,
-            None => panic!("Statement was not an IntegerLiteral"),
-        };
-        test_integer(integer, 5);
+            .clone()
+            .as_integer_literal()
+            .expect("expression was not a integer literal");
+        test_integer(&integer, 5);
     }
 
     #[test]
@@ -741,29 +727,28 @@ mod tests {
         let v = vec![("!true;", "!", true), ("!false;", "!", false)];
         for exp in v {
             let program = test_helper(exp.0);
-            let statement = program.statements.get(0).unwrap().as_any();
-            let statement = match statement.downcast_ref::<ExpressionStatement>() {
-                Some(v) => v,
-                None => panic!("Statement was not an expression statement"),
-            };
-            let prefix = match statement
+            let statement = program.statements.get(0).unwrap();
+            let statement = statement
+                .clone()
+                .as_expression_statement()
+                .expect("Statement was not an expression statement");
+            let prefix = statement
                 .expression()
-                .as_any()
-                .downcast_ref::<PrefixExpression>()
-            {
-                Some(v) => v,
-                None => panic!("Statement was not a Prefix Expression"),
-            };
+                .clone()
+                .as_prefix_expression()
+                .expect(
+                    format!(
+                        "expression was a {}, expected a prefix expression",
+                        statement
+                    )
+                    .as_str(),
+                );
             assert_eq!(prefix.operator(), exp.1);
-            let integer = match prefix
-                .expression_right()
-                .as_any()
-                .downcast_ref::<BooleanLiteral>()
-            {
-                Some(v) => v,
-                None => panic!("Statement was not an Integer Literal"),
-            };
-            test_bool(integer, exp.2);
+            let boolean = prefix
+                .expression_right().clone()
+                .as_boolean_literal()
+                .expect("expression was not an boolean literal");
+            test_bool(&boolean, exp.2);
         }
     }
     #[test]
@@ -771,29 +756,23 @@ mod tests {
         let v = vec![("!5;", "!", 5), ("-15;", "-", 15)];
         for exp in v {
             let program = test_helper(exp.0);
-            let statement = program.statements.get(0).unwrap().as_any();
-            let statement = match statement.downcast_ref::<ExpressionStatement>() {
-                Some(v) => v,
-                None => panic!("Statement was not an expression statement"),
-            };
-            let prefix = match statement
-                .expression()
-                .as_any()
-                .downcast_ref::<PrefixExpression>()
-            {
-                Some(v) => v,
-                None => panic!("Statement was not a Prefix Expression"),
-            };
+            let statement = program.statements.get(0).unwrap();
+            let statement = statement.clone()
+                .as_expression_statement()
+                .expect("Statement was not an expression statement");
+            let prefix = statement.expression().clone().as_prefix_expression().expect(
+                format!(
+                    "expression was a {}, expected a prefix expression",
+                    statement
+                )
+                .as_str(),
+            );
             assert_eq!(prefix.operator(), exp.1);
-            let integer = match prefix
-                .expression_right()
-                .as_any()
-                .downcast_ref::<IntegerLiteral>()
-            {
-                Some(v) => v,
-                None => panic!("Statement was not an Integer Literal"),
-            };
-            test_integer(integer, exp.2);
+            let integer = prefix
+                .expression_right().clone()
+                .as_integer_literal()
+                .expect("expression was not an integer literal");
+            test_integer(&integer, exp.2);
         }
     }
 
@@ -806,27 +785,15 @@ mod tests {
         ];
         for exp in v {
             let program = test_helper(exp.0);
-            let statement = program.statements.get(0).unwrap().as_any();
-            let statement = match statement.downcast_ref::<ExpressionStatement>() {
-                Some(v) => v,
-                None => panic!("Statement was not an expression statement"),
-            };
-            let infix = match statement
-                .expression()
-                .as_any()
-                .downcast_ref::<InfixExpression>()
-                .clone()
-                .as_mut()
-            {
-                Some(v) => v.to_owned(),
-                None => panic!("Statement was not a Infix Expression"),
-            };
-            test_infix_expression(
-                &Box::new(infix),
-                Types::Bool(exp.1),
-                exp.2,
-                Types::Bool(exp.3),
-            );
+            let statement = program.statements.get(0).unwrap();
+            let statement = statement.clone()
+                .as_expression_statement()
+                .expect("Statement was not an expression statement");
+            let infix = statement
+                .expression().clone()
+                .as_infix_expression()
+                .expect("expression was not an infix expression");
+            test_infix_expression(&*infix, Types::Bool(exp.1), exp.2, Types::Bool(exp.3));
         }
     }
 
@@ -844,27 +811,15 @@ mod tests {
         ];
         for exp in v {
             let program = test_helper(exp.0);
-            let statement = program.statements.get(0).unwrap().as_any();
-            let statement = match statement.downcast_ref::<ExpressionStatement>() {
-                Some(v) => v,
-                None => panic!("Statement was not an expression statement"),
-            };
-            let infix = match statement
-                .expression()
-                .as_any()
-                .downcast_ref::<InfixExpression>()
-                .clone()
-                .as_mut()
-            {
-                Some(v) => v.to_owned(),
-                None => panic!("Statement was not a Infix Expression"),
-            };
-            test_infix_expression(
-                &Box::new(infix),
-                Types::Isize(exp.1),
-                exp.2,
-                Types::Isize(exp.3),
-            );
+            let statement = program.statements.get(0).unwrap();
+            let statement = statement.clone()
+                .as_expression_statement()
+                .expect("Statement was not an expression statement");
+            let infix = statement
+                .expression().clone()
+                .as_infix_expression()
+                .expect("expression was not an infix expression");
+            test_infix_expression(&*infix, Types::Isize(exp.1), exp.2, Types::Isize(exp.3));
         }
     }
 
@@ -923,49 +878,30 @@ mod tests {
         let input = "if (x < y) { x }";
         let program = test_helper(input);
         let statement = program.statements.get(0).expect("Could not find statement");
-        let statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
-            Some(v) => v,
-            None => panic!("Could not convert into ExpressionStatement"),
-        };
-        let if_expression = match statement
-            .expression()
-            .as_any()
-            .downcast_ref::<IfExpression>()
-        {
-            Some(v) => v,
-            None => panic!("Could not convert into IfExpression"),
-        };
-        let condition = match if_expression
-            .condition()
-            .as_any()
-            .downcast_ref::<InfixExpression>()
-        {
-            Some(v) => v,
-            None => panic!("Could not convert into InfixExpression"),
-        };
-        test_infix_expression(
-            &Box::new(condition),
-            Types::String("x"),
-            "<",
-            Types::String("y"),
-        );
+        let statement = statement.clone()
+            .as_expression_statement()
+            .expect("Statement was not an expression statement");
+        let if_expression = statement
+            .expression().clone()
+            .as_if_expression()
+            .expect("expression was not an if expression");
+        let condition = if_expression
+            .condition().clone()
+            .as_infix_expression()
+            .expect("expression was not an infix expression");
+        test_infix_expression(&*condition, Types::String("x"), "<", Types::String("y"));
         let consequence = if_expression
             .consequence()
-            .as_any()
-            .downcast_ref::<BlockStatement>()
-            .expect("Could not convert into BlockStatement")
             .statements()
             .get(0)
-            .expect("Could not get statement")
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
+            .expect("Could not get statement").clone()
+            .as_expression_statement()
             .expect("Could not convert into ExpressionStatement");
         let ident = consequence
-            .expression()
-            .as_any()
-            .downcast_ref::<Identifier>()
+            .expression().clone()
+            .as_identifier()
             .expect("Could not convert into ExpressionStatement");
-        test_ident(ident, "x");
+        test_ident(&ident, "x");
         assert!(if_expression.alternative().is_none());
     }
 
@@ -974,67 +910,42 @@ mod tests {
         let input = "if (x < y) { x } else { y }";
         let program = test_helper(input);
         let statement = program.statements.get(0).expect("Could not find statement");
-        let statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
-            Some(v) => v,
-            None => panic!("Could not convert into ExpressionStatement"),
-        };
-        let if_expression = match statement
-            .expression()
-            .as_any()
-            .downcast_ref::<IfExpression>()
-        {
-            Some(v) => v,
-            None => panic!("Could not convert into IfExpression"),
-        };
-        let condition = match if_expression
-            .condition()
-            .as_any()
-            .downcast_ref::<InfixExpression>()
-        {
-            Some(v) => v,
-            None => panic!("Could not convert into InfixExpression"),
-        };
-        test_infix_expression(
-            &Box::new(condition),
-            Types::String("x"),
-            "<",
-            Types::String("y"),
-        );
+        let statement = statement.clone()
+            .as_expression_statement().clone()
+            .expect("Statement was not an expression statement");
+        let if_expression = statement
+            .expression().clone()
+            .as_if_expression()
+            .expect("expression was not an if expression");
+        let condition = if_expression
+            .condition().clone()
+            .as_infix_expression()
+            .expect("expression was not an infix expression");
+        test_infix_expression(&*condition, Types::String("x"), "<", Types::String("y"));
         let consequence = if_expression
             .consequence()
-            .as_any()
-            .downcast_ref::<BlockStatement>()
-            .expect("Could not convert into block statement")
             .statements()
             .get(0)
-            .expect("Could not get statement")
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
+            .expect("Could not get statement").clone()
+            .as_expression_statement()
             .expect("Could not convert into ExpressionStatement");
         let ident = consequence
-            .expression()
-            .as_any()
-            .downcast_ref::<Identifier>()
+            .expression().clone()
+            .as_identifier()
             .expect("Could not convert into Identifier");
-        test_ident(ident, "x");
+        test_ident(&ident, "x");
         let alternative = if_expression
-            .alternative()
-            .as_ref()
+            .alternative().clone()
             .expect("Expected there to be an else block")
-            .as_any()
-            .downcast_ref::<BlockStatement>()
-            .expect("Could not convert to BlockStatement")
             .statements()
             .get(0)
-            .expect("Could not get statement")
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
+            .expect("Could not get statement").clone()
+            .as_expression_statement()
             .expect("Could not convert into ExpressionStatement")
-            .expression()
-            .as_any()
-            .downcast_ref::<Identifier>()
+            .expression().clone()
+            .as_identifier()
             .expect("Could not convert into Identifier");
-        test_ident(alternative, "y");
+        test_ident(&alternative, "y");
     }
 
     #[test]
@@ -1042,39 +953,28 @@ mod tests {
         let input = "fn(x, y) { x + y }";
         let program = test_helper(input);
         let statement = program.statements.get(0).unwrap();
-        println!("{}", statement);
-        let exp_statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
-            Some(v) => v,
-            None => panic!("statement was not an ExpressionStatement"),
-        };
-        let fn_literal = match exp_statement
-            .expression()
-            .as_any()
-            .downcast_ref::<FunctionLiteral>()
-        {
-            Some(v) => v,
-            None => panic!("expression was not a FunctionLiteral"),
-        };
+        let statement = statement.clone()
+            .as_expression_statement()
+            .expect("Statement was not an expression statement");
+        let fn_literal = statement
+            .expression().clone()
+            .as_function_literal()
+            .expect("expression was not a function literal");
         assert_eq!(fn_literal.parameters().len(), 2);
         test_ident(fn_literal.parameters().get(0).unwrap(), "x");
         test_ident(fn_literal.parameters().get(1).unwrap(), "y");
         assert_eq!(fn_literal.body().statements().len(), 1);
-        let infix = match fn_literal
+        let infix = fn_literal
             .body()
             .statements()
             .get(0)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
+            .unwrap().clone()
+            .as_expression_statement()
             .expect("Should be an expression statement i hope")
-            .expression()
-            .as_any()
-            .downcast_ref::<InfixExpression>()
-        {
-            Some(v) => v,
-            None => panic!("fn_literal body statement was not an InfixExpression"),
-        };
-        test_infix_expression(infix, Types::String("x"), "+", Types::String("y"));
+            .expression().clone()
+            .as_infix_expression()
+            .expect("expression was not an infix expression");
+        test_infix_expression(&infix, Types::String("x"), "+", Types::String("y"));
     }
 
     #[test]
@@ -1088,19 +988,13 @@ mod tests {
         for (input, expected) in inputs {
             let program = test_helper(input);
             let statement = program.statements.get(0).unwrap();
-            let exp_statement = match statement.as_any().downcast_ref::<ExpressionStatement>() {
-                Some(v) => v,
-                None => panic!("statement was not an ExpressionStatement"),
-            };
-            let fn_literal = match exp_statement
-                .expression()
-                .as_any()
-                .downcast_ref::<FunctionLiteral>()
-            {
-                Some(v) => v,
-                None => panic!("ExpressionStatement was not FunctionLiteral"),
-            };
-
+            let statement = statement.clone()
+                .as_expression_statement()
+                .expect("Statement was not an expression statement");
+            let fn_literal = statement
+                .expression().clone()
+                .as_function_literal()
+                .expect("expression was not a function literal");
             assert_eq!(expected.len(), fn_literal.parameters().len());
             for (i, ident) in fn_literal.parameters().iter().enumerate() {
                 test_ident(ident, expected.get(i).unwrap());
@@ -1112,41 +1006,35 @@ mod tests {
     fn test_call_expression() {
         let input = "add(1, 2 * 3, 4 + 5)";
         let program = test_helper(input);
-
         let statement = program.statements.get(0).unwrap();
-        let exp_statement = statement
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
-            .expect("statement was not an ExpressionStatement");
-        let call_expression = exp_statement
-            .expression()
-            .as_any()
-            .downcast_ref::<CallExpression>()
+        let statement = statement.clone()
+            .as_expression_statement()
+            .expect("Statement was not an expression statement");
+        let call_expression = statement
+            .expression().clone()
+            .as_call_expression()
             .expect("ExpressionStatement was not a CallExpression");
         let ident = call_expression
-            .function()
-            .as_any()
-            .downcast_ref::<Identifier>()
+            .function().clone()
+            .as_identifier()
             .expect("function was not an Identifier");
-        test_ident(ident, "add");
+        test_ident(&ident, "add");
         assert_eq!(call_expression.arguments().len(), 3);
 
-        test_literal(call_expression.arguments().get(0).unwrap(), Types::Isize(1));
+        test_literal(call_expression.arguments().get(0).unwrap().clone(), Types::Isize(1));
         let first_infix = call_expression
             .arguments()
             .get(1)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<InfixExpression>()
+            .unwrap().clone()
+            .as_infix_expression()
             .expect("argument was not an InifixExpression");
-        test_infix_expression(first_infix, Types::Isize(2), "*", Types::Isize(3));
+        test_infix_expression(&first_infix, Types::Isize(2), "*", Types::Isize(3));
         let second_infix = call_expression
             .arguments()
             .get(2)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<InfixExpression>()
+            .unwrap().clone()
+            .as_infix_expression()
             .expect("argument was not an InifixExpression");
-        test_infix_expression(second_infix, Types::Isize(4), "+", Types::Isize(5));
+        test_infix_expression(&second_infix, Types::Isize(4), "+", Types::Isize(5));
     }
 }

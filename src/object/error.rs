@@ -1,4 +1,4 @@
-use super::{Object, ObjectType};
+use super::{Object, ObjectTypes};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Error {
@@ -16,8 +16,8 @@ impl Error {
 }
 
 impl Object for Error {
-    fn obj_type(&self) -> ObjectType {
-        "ERROR".into()
+    fn obj_type(&self) -> ObjectTypes {
+        ObjectTypes::Error
     }
 
     fn inspect(&self) -> String {

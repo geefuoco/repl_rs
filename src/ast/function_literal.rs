@@ -2,6 +2,7 @@ use super::Identifier;
 use crate::ast::{BlockStatement, Expression, Node, Token};
 use std::fmt::Display;
 
+#[derive(Debug, Clone)]
 pub struct FunctionLiteral {
     token: Token,
     parameters: Vec<Identifier>,

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use super::Object;
+use super::Objects;
 
 pub struct Environment {
-    store: HashMap<String, Box<dyn Object>>,
+    store: HashMap<String, Objects>,
 }
 
 impl Environment {
@@ -13,11 +13,11 @@ impl Environment {
         }
     }
 
-    pub fn get(&mut self, key: String) -> Option<Box<dyn Object>> {
+    pub fn get(&mut self, key: String) -> Option<Objects> {
         self.store.get(&key).cloned()
     }
 
-    pub fn set(&mut self, key: String, value: Box<dyn Object>) {
+    pub fn set(&mut self, key: String, value: Objects) {
         self.store.insert(key, value);
     }
 }

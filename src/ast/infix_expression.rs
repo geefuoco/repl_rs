@@ -3,6 +3,7 @@ use std::fmt::Display;
 
 use super::Expressions;
 
+#[derive(Debug, Clone)]
 pub struct InfixExpression {
     token: Token,
     operator: String,

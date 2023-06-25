@@ -1,6 +1,7 @@
 use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
+#[derive(Debug, Clone)]
 pub struct BooleanLiteral {
     token: Token,
     value: bool,

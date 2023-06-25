@@ -3,6 +3,7 @@ use std::fmt::Display;
 
 use super::Expressions;
 
+#[derive(Debug, Clone)]
 pub struct ReturnStatement {
     token: Token,
     return_value: Expressions,

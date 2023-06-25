@@ -2,6 +2,7 @@ use super::Expressions;
 use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
+#[derive(Debug, Clone)]
 pub struct CallExpression {
     token: Token,
     function: Expressions,
@@ -21,11 +22,11 @@ impl CallExpression {
     }
 
     pub fn function(&self) -> &Expressions {
-        self.function.as_ref()
+        &self.function
     }
 
     pub fn arguments(&self) -> &[Expressions] {
-        self.arguments.as_ref()
+        &self.arguments
     }
 }
 

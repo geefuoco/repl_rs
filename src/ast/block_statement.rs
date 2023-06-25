@@ -1,8 +1,9 @@
-use crate::ast::{Expression, Node, Statement, Token};
+use crate::ast::{Node, Statement, Token};
 use std::fmt::Display;
 
 use super::Statements;
 
+#[derive(Debug, Clone)]
 pub struct BlockStatement {
     token: Token,
     statements: Vec<Statements>,

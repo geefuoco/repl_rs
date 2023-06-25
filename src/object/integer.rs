@@ -1,4 +1,4 @@
-use super::Object;
+use super::{Object, ObjectTypes};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Integer {
@@ -16,8 +16,8 @@ impl Integer {
 }
 
 impl Object for Integer {
-    fn obj_type(&self) -> super::ObjectType {
-        "INTEGER".into()
+    fn obj_type(&self) -> ObjectTypes {
+        ObjectTypes::Integer
     }
 
     fn inspect(&self) -> String {

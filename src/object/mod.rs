@@ -16,13 +16,22 @@ pub use integer::Integer;
 pub use null::Null;
 pub use return_object::Return;
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Objects {
-    Intger(Integer),
+    Integer(Integer),
     Boolean(Boolean),
     Null(Null),
     Return(Return),
     Error(ErrorObject),
+}
+
+#[derive(Debug, PartialEq, PartialOrd)]
+pub enum ObjectTypes {
+    Integer,
+    Boolean,
+    Null,
+    Return,
+    Error,
 }
 
 impl Display for Objects {
@@ -37,28 +46,59 @@ impl Display for Objects {
     }
 }
 
-impl Object for Objects {
-    fn obj_type(&self) -> ObjectType {
+impl Objects {
+    pub fn as_integer(self) -> Option<Integer> {
         match self {
-            x => x.obj_type()
+            Objects::Integer(x) => Some(x),
+            _ => None,
+        }
+    }
+    pub fn as_boolean(self) -> Option<Boolean> {
+        match self {
+            Objects::Boolean(x) => Some(x),
+            _ => None,
+        }
+    }
+    pub fn as_null(self) -> Option<Null> {
+        match self {
+            Objects::Null(x) => Some(x),
+            _ => None,
+        }
+    }
+    pub fn as_return(self) -> Option<Return> {
+        match self {
+            Objects::Return(x) => Some(x),
+            _ => None,
+        }
+    }
+    pub fn as_err(self) -> Option<ErrorObject> {
+        match self {
+            Objects::Error(x) => Some(x),
+            _ => None,
+        }
+    }
+}
+
+impl Object for Objects {
+    fn obj_type(&self) -> ObjectTypes {
+        match self {
+            x => x.obj_type(),
         }
     }
 
     fn inspect(&self) -> String {
         match self {
-            x => x.inspect()
+            x => x.inspect(),
         }
     }
 
     fn is_err(&self) -> bool {
         match self {
             Objects::Error(x) => true,
-            _ => false
+            _ => false,
         }
     }
 }
-
-type ObjectType = String;
 
 pub struct CastError {
     obj_type: String,
@@ -85,11 +125,11 @@ impl Debug for CastError {
 }
 
 pub trait Object: Debug {
-    fn obj_type(&self) -> ObjectType;
+    fn obj_type(&self) -> ObjectTypes;
     fn inspect(&self) -> String;
     fn is_err(&self) -> bool {
         match self.obj_type() {
-            Object::ERROR(_) => true,
+            ObjectTypes::Error => true,
             _ => false,
         }
     }

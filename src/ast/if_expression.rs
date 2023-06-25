@@ -2,9 +2,10 @@ use super::{Expressions, OptionalBlockStatement};
 use crate::ast::{block_statement::BlockStatement, Expression, Node, Token};
 use std::fmt::Display;
 
+#[derive(Debug, Clone)]
 pub struct IfExpression {
     token: Token,
-    condition: Box<dyn Expression>,
+    condition: Box<Expressions>,
     consequence: BlockStatement,
     //The wrapper for option is here to allow for impl display block
     alternative: OptionalBlockStatement<BlockStatement>,
@@ -19,7 +20,7 @@ impl IfExpression {
     ) -> Self {
         Self {
             token,
-            condition,
+            condition: Box::new(condition),
             consequence,
             alternative,
         }
@@ -33,7 +34,7 @@ impl IfExpression {
         &self.consequence
     }
 
-    pub fn condition(&self) -> &Box<dyn Expression> {
+    pub fn condition(&self) -> &Box<Expressions> {
         &self.condition
     }
 

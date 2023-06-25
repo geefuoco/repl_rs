@@ -1,4 +1,4 @@
-use super::{Object, ObjectType};
+use super::{Object, ObjectTypes};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Boolean {
@@ -16,8 +16,8 @@ impl Boolean {
 }
 
 impl Object for Boolean {
-    fn obj_type(&self) -> ObjectType {
-        "BOOLEAN".into()
+    fn obj_type(&self) -> ObjectTypes {
+        ObjectTypes::Boolean
     }
 
     fn inspect(&self) -> String {

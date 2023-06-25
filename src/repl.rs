@@ -1,3 +1,4 @@
+use crate::object::Object;
 use crate::{evaluator, lexer::Lexer, object::Environment, parser::Parser};
 use std::io;
 
