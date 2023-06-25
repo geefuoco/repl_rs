@@ -12,6 +12,7 @@ use crate::object::Null;
 use crate::object::Object;
 use crate::object::ObjectTypes;
 use crate::object::Objects;
+use crate::object::Return;
 
 const TRUE: Boolean = Boolean { value: true };
 const FALSE: Boolean = Boolean { value: false };
@@ -68,6 +69,7 @@ fn eval_statement(statement: &Statements, env: &mut Environment) -> Option<Objec
             if return_value.is_err() {
                 return Some(return_value);
             }
+            result = Some(Objects::Return(Return::new(return_value)));
         }
         Statements::ExpressionStatement(value) => {
             result = Some(eval_expression(value.expression(), env));
@@ -96,7 +98,8 @@ fn eval_statements(statements: &[Statements], env: &mut Environment) -> Option<O
             }
             Statements::ReturnStatement(value) => {
                 let return_value = eval_expression(value.return_value(), env);
-                return Some(return_value);
+                let ret = Objects::Return(Return::new(return_value));
+                return Some(ret);
             }
             Statements::ExpressionStatement(value) => {
                 result = Some(eval_expression(value.expression(), env));
@@ -174,7 +177,7 @@ fn eval_minus_operator_expression(exp: &Objects) -> Objects {
             let v: isize = exp.inspect().parse().expect("Value was not an isize");
             Objects::Integer(Integer::new(-v))
         }
-        _ => Objects::Error(ErrorObject::new(format!("unknown operator: -{:?}", exp))),
+        _ => Objects::Error(ErrorObject::new(format!("unknown operator: -{}", exp))),
     }
 }
 
@@ -183,7 +186,7 @@ fn eval_prefix_expression(operator: &str, right: &Objects) -> Objects {
         "!" => eval_bang_operator_expression(right),
         "-" => eval_minus_operator_expression(right),
         _ => Objects::Error(ErrorObject::new(format!(
-            "unknown operator: {}{:?}",
+            "unknown operator: {}{}",
             operator, right
         ))),
     }
@@ -204,12 +207,12 @@ fn eval_infix_expression(operator: &str, left: Objects, right: Objects) -> Objec
         Objects::Boolean(bool_helper(left != right))
     } else if left.obj_type() != right.obj_type() {
         Objects::Error(ErrorObject::new(format!(
-            "type mismatch: {:?} {} {:?}",
+            "type mismatch: {} {} {}",
             left, operator, right
         )))
     } else {
         Objects::Error(ErrorObject::new(format!(
-            "unknown operator: {:?} {} {:?}",
+            "unknown operator: {} {} {}",
             left, operator, right
         )))
     }
@@ -226,7 +229,7 @@ fn eval_integer_infix_expression(operator: &str, left: &Integer, right: &Integer
         "==" => Objects::Boolean(Boolean::new(left.value() == right.value())),
         "!=" => Objects::Boolean(Boolean::new(left.value() != right.value())),
         _ => Objects::Error(ErrorObject::new(format!(
-            "unknown operator: {:?} {} {:?}",
+            "unknown operator: {} {} {}",
             left, operator, right
         ))),
     }
@@ -448,7 +451,12 @@ mod test {
             match evaluated {
                 Some(v) => match v {
                     Objects::Return(ret) => test_int(ret.value(), &i),
-                    _ => assert!(false, "Objects was not a return value"),
+                    _ => {
+                        let exp = v.obj_type();
+                        let msg = format!("Expcted Return. Got {}", &exp);
+                        eprintln!("{}", msg);
+                        assert!(false);
+                    }
                 },
                 None => println!("No output"),
             }
@@ -474,6 +482,7 @@ mod test {
         ];
 
         for (s, exp) in inputs {
+            println!("{}", exp);
             let evaluated = test_eval(s);
             match evaluated {
                 Some(o) => match o {

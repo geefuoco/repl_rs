@@ -44,7 +44,18 @@ impl Node for CallExpression {
 
 impl Display for CallExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}(", self.function.token_literal())?;
+        let context = match &self.function {
+            Expressions::Empty => panic!("Tried to print token of an empty expression"),
+            Expressions::Identifier(x) => String::from(x.token_literal()),
+            Expressions::BooleanLiteral(x) => String::from(x.token_literal()),
+            Expressions::IntegerLiteral(x) => String::from(x.token_literal()),
+            Expressions::IfExpression(x) => String::from(x.token_literal()),
+            Expressions::InfixExpression(x) => String::from(x.token_literal()),
+            Expressions::PrefixExpression(x) => String::from(x.token_literal()),
+            Expressions::CallExpression(x) => String::from(x.token_literal()),
+            Expressions::FunctionLiteral(x) => String::from(x.token_literal()),
+        };
+        write!(f, "{}(", context)?;
         let n = self.arguments.len();
         for (i, param) in self.arguments().iter().enumerate() {
             write!(f, "{}", param)?;

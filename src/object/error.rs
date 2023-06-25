@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::{Object, ObjectTypes};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -22,5 +24,10 @@ impl Object for Error {
 
     fn inspect(&self) -> String {
         format!("{}", self.message)
+    }
+}
+impl Display for Error{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.obj_type())
     }
 }

@@ -34,14 +34,26 @@ pub enum ObjectTypes {
     Error,
 }
 
+impl Display for ObjectTypes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ObjectTypes::Integer => write!(f, "INTEGER"),
+            ObjectTypes::Boolean => write!(f, "BOOLEAN"),
+            ObjectTypes::Null => write!(f, "NULL"),
+            ObjectTypes::Return => write!(f, "RETURN"),
+            ObjectTypes::Error => write!(f, "ERROR"),
+        }
+    }
+}
+
 impl Display for Objects {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Objects::Integer(_) => write!(f, "INTEGER"),
-            Objects::Boolean(_) => write!(f, "BOOLEAN"),
-            Objects::Null(_) => write!(f, "NULL"),
-            Objects::Return(_) => write!(f, "RETURN"),
-            Objects::Error(_) => write!(f, "ERROR"),
+            Objects::Integer(x) => write!(f, "{}", x.obj_type()),
+            Objects::Boolean(x) => write!(f, "{}", x.obj_type()),
+            Objects::Null(x) => write!(f, "{}", x.obj_type()),
+            Objects::Return(x) => write!(f, "{}", x.obj_type()),
+            Objects::Error(x) => write!(f, "{}", x.obj_type()),
         }
     }
 }
@@ -82,13 +94,21 @@ impl Objects {
 impl Object for Objects {
     fn obj_type(&self) -> ObjectTypes {
         match self {
-            x => x.obj_type(),
+            Objects::Integer(x) => x.obj_type(),
+            Objects::Boolean(x) => x.obj_type(),
+            Objects::Null(x) => x.obj_type(),
+            Objects::Return(x) => x.obj_type(),
+            Objects::Error(x) => x.obj_type(),
         }
     }
 
     fn inspect(&self) -> String {
         match self {
-            x => x.inspect(),
+            Objects::Integer(x) => x.inspect(),
+            Objects::Boolean(x) => x.inspect(),
+            Objects::Null(x) => x.inspect(),
+            Objects::Return(x) => x.inspect(),
+            Objects::Error(x) => x.inspect(),
         }
     }
 

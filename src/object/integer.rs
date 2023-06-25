@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::{Object, ObjectTypes};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -22,5 +24,10 @@ impl Object for Integer {
 
     fn inspect(&self) -> String {
         format!("{}", self.value)
+    }
+}
+impl Display for Integer{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.obj_type())
     }
 }

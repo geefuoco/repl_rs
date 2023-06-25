@@ -95,34 +95,18 @@ impl Expressions {
     }
 }
 
-impl Expression for Expressions {
-    fn expression_node(&self) {
-        match self {
-            Expressions::Empty => panic!("Tried to get expression node from empty expression"),
-            Expressions::Identifier(_) => todo!(),
-            Expressions::BooleanLiteral(_) => todo!(),
-            Expressions::IntegerLiteral(_) => todo!(),
-            Expressions::IfExpression(_) => todo!(),
-            Expressions::InfixExpression(_) => todo!(),
-            Expressions::PrefixExpression(_) => todo!(),
-            Expressions::CallExpression(_) => todo!(),
-            Expressions::FunctionLiteral(_) => todo!(),
-        }
-    }
-}
-
-impl Node for Expressions {
-    fn token_literal(&self) -> &str {
-        match self {
-            x => x.token_literal(),
-        }
-    }
-}
-
 impl Display for Expressions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            x => write!(f, "{}", self),
+            Expressions::Identifier(x) => write!(f, "{}", x),
+            Expressions::BooleanLiteral(x) => write!(f, "{}", x),
+            Expressions::IntegerLiteral(x) => write!(f, "{}", x),
+            Expressions::IfExpression(x) => write!(f, "{}", x),
+            Expressions::InfixExpression(x) => write!(f, "{}", x),
+            Expressions::PrefixExpression(x) => write!(f, "{}", x),
+            Expressions::CallExpression(x) => write!(f, "{}", x),
+            Expressions::FunctionLiteral(x) => write!(f, "{}", x),
+            Expressions::Empty => panic!("Cannot display an empty expression"),
         }
     }
 }
@@ -164,34 +148,14 @@ impl Statements {
     }
 }
 
-// impl Statement for Statements {
-//     fn statement_node(&self) {
-//         match self {
-//             Statements::LetStatement(x) => x.statement_node(),
-//             Statements::ReturnStatement(x) => x.statement_node(),
-//             Statements::ExpressionStatement(x) => x.statement_node(),
-//             Statements::BlockStatement(x) => x.statement_node(),
-//             Statements::Empty => panic!("Tried to get statement node from empy statement"),
-//         }
-//     }
-// }
-//
-impl Node for Statements {
-    fn token_literal(&self) -> &str {
-        match self {
-            Statements::LetStatement(x) =>x.token_literal(),
-            Statements::ReturnStatement(x) =>x.token_literal(),
-            Statements::ExpressionStatement(x) =>x.token_literal() ,
-            Statements::BlockStatement(x) => x.token_literal(),
-            Statements::Empty => panic!("Tried to get token from empty statement"),
-        }
-    }
-}
-
 impl Display for Statements {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            x => write!(f, "{}", self),
+            Statements::LetStatement(x) => write!(f, "{}", x),
+            Statements::ReturnStatement(x) => write!(f, "{}", x),
+            Statements::ExpressionStatement(x) => write!(f, "{}", x),
+            Statements::BlockStatement(x) => write!(f, "{}", x),
+            Statements::Empty => panic!("Cannot display an empty statement"),
         }
     }
 }
@@ -202,12 +166,6 @@ pub trait Node: Display {
 
 pub trait Statement: Node {
     fn statement_node(&self);
-}
-
-impl Debug for dyn Statement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Statement {{ {} }}", self.token_literal())
-    }
 }
 
 pub trait Expression: Node {
@@ -237,9 +195,16 @@ impl Display for Program {
 impl Node for Program {
     fn token_literal(&self) -> &str {
         if self.statements.len() > 0 {
-            return self.statements[0].token_literal();
+            match &self.statements[0] {
+                Statements::LetStatement(stmt) => stmt.token_literal(),
+                Statements::ReturnStatement(stmt) => stmt.token_literal(),
+                Statements::ExpressionStatement(stmt) => stmt.token_literal(),
+                Statements::BlockStatement(stmt) => stmt.token_literal(),
+                Statements::Empty => panic!("Program encountered empty statement"),
+            }
+        } else {
+            ""
         }
-        ""
     }
 }
 
