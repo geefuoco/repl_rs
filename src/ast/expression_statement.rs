@@ -1,7 +1,7 @@
 use crate::ast::{Expressions, Node, Statement, Token};
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct ExpressionStatement {
     token: Token,
     expression: Expressions,

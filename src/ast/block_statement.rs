@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use super::Statements;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct BlockStatement {
     token: Token,
     statements: Vec<Statements>,

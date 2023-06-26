@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Clone, Default, PartialOrd)]
 pub enum Token {
     Ident(String),
     Integer(String),

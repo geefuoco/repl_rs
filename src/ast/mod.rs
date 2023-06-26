@@ -27,7 +27,7 @@ pub use let_statement::LetStatement;
 pub use prefix_expression::PrefixExpression;
 pub use return_statement::ReturnStatement;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
 pub enum Expressions {
     Identifier(Identifier),
     BooleanLiteral(BooleanLiteral),
@@ -111,7 +111,7 @@ impl Display for Expressions {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
 pub enum Statements {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
@@ -208,7 +208,7 @@ impl Node for Program {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct OptionalBlockStatement<T>(Option<T>);
 
 impl<T> OptionalBlockStatement<T> {

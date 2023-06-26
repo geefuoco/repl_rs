@@ -2,7 +2,7 @@ use super::Expressions;
 use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct CallExpression {
     token: Token,
     function: Expressions,

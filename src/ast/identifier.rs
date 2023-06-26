@@ -1,7 +1,7 @@
 use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Identifier {
     token: Token,
     value: String,

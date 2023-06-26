@@ -2,22 +2,51 @@ use std::collections::HashMap;
 
 use super::Objects;
 
+#[derive(Debug, Clone)]
 pub struct Environment {
     store: HashMap<String, Objects>,
+    outer: Option<Box<Environment>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
         Self {
             store: HashMap::new(),
+            outer: None,
         }
     }
 
     pub fn get(&mut self, key: String) -> Option<Objects> {
-        self.store.get(&key).cloned()
+        let mut result = self.store.get(&key).cloned();
+        if result.is_none() && self.outer.is_some() {
+            result = self.outer.as_ref().unwrap().store.get(&key).cloned();
+        }
+        result
     }
 
     pub fn set(&mut self, key: String, value: Objects) {
         self.store.insert(key, value);
+    }
+
+    pub fn set_outer_env(&mut self, outer: Environment) {
+        self.outer = Some(Box::new(outer));
+    }
+
+    pub fn new_enclosed_environment(outer: Environment) -> Environment {
+        let mut new_env = Environment::new();
+        new_env.set_outer_env(outer);
+        new_env
+    }
+}
+
+impl PartialEq for Environment {
+    fn eq(&self, other: &Self) -> bool {
+        panic!("Tried to equate to Environments");
+    }
+}
+
+impl PartialOrd for Environment {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        panic!("Tried to compare Environments")
     }
 }

@@ -9,9 +9,11 @@ mod error;
 mod integer;
 mod null;
 mod return_object;
+mod function;
 pub use boolean::Boolean;
 pub use environment::Environment;
 pub use error::Error as ErrorObject;
+pub use function::Function;
 pub use integer::Integer;
 pub use null::Null;
 pub use return_object::Return;
@@ -23,6 +25,7 @@ pub enum Objects {
     Null(Null),
     Return(Return),
     Error(ErrorObject),
+    Function(Function)
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -32,6 +35,7 @@ pub enum ObjectTypes {
     Null,
     Return,
     Error,
+    Function
 }
 
 impl Display for ObjectTypes {
@@ -42,6 +46,7 @@ impl Display for ObjectTypes {
             ObjectTypes::Null => write!(f, "NULL"),
             ObjectTypes::Return => write!(f, "RETURN"),
             ObjectTypes::Error => write!(f, "ERROR"),
+            ObjectTypes::Function => write!(f, "FUNCTION")
         }
     }
 }
@@ -54,6 +59,7 @@ impl Display for Objects {
             Objects::Null(x) => write!(f, "{}", x.obj_type()),
             Objects::Return(x) => write!(f, "{}", x.obj_type()),
             Objects::Error(x) => write!(f, "{}", x.obj_type()),
+            Objects::Function(x) => write!(f, "{}", x.obj_type())
         }
     }
 }
@@ -83,6 +89,12 @@ impl Objects {
             _ => None,
         }
     }
+    pub fn as_fn(self) -> Option<Function> {
+        match self {
+            Objects::Function(x) => Some(x),
+            _ => None
+        }
+    }
     pub fn as_err(self) -> Option<ErrorObject> {
         match self {
             Objects::Error(x) => Some(x),
@@ -99,6 +111,7 @@ impl Object for Objects {
             Objects::Null(x) => x.obj_type(),
             Objects::Return(x) => x.obj_type(),
             Objects::Error(x) => x.obj_type(),
+            Objects::Function(x) => x.obj_type(),
         }
     }
 
@@ -109,6 +122,7 @@ impl Object for Objects {
             Objects::Null(x) => x.inspect(),
             Objects::Return(x) => x.inspect(),
             Objects::Error(x) => x.inspect(),
+            Objects::Function(x) => x.inspect()
         }
     }
 

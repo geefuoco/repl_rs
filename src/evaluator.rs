@@ -7,6 +7,7 @@ use crate::ast::Statements;
 use crate::object::Boolean;
 use crate::object::Environment;
 use crate::object::ErrorObject;
+use crate::object::Function;
 use crate::object::Integer;
 use crate::object::Null;
 use crate::object::Object;
@@ -151,10 +152,59 @@ fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
             }
             return eval_prefix_expression(value.operator(), &right);
         }
-        // Expressions::CallExpression(value) => {}
-        // Expressions::FunctionLiteral(value) => {}
+        Expressions::FunctionLiteral(value) => {
+            let params: Vec<Identifier> = value.parameters().to_vec();
+            let body = value.body();
+            return Objects::Function(Function::new(params.clone(), body.clone(), env.clone()));
+        }
+        Expressions::CallExpression(value) => {
+            let func = eval_expression(value.function(), env);
+            if func.is_err() {
+                return func;
+            }
+            let mut arguments = eval_expressions(value.arguments(), env);
+            if arguments.len() == 1 && arguments[0].is_err() {
+                return arguments.remove(0);
+            }
+            return apply_function(func, arguments);
+        }
         _ => Objects::Null(NULL),
     }
+}
+
+fn apply_function(func: Objects, arguments: Vec<Objects>) -> Objects {
+    if let Some(func) = func.clone().as_fn() {
+        let extended_env = extend_function_env(&func, arguments);
+        if extended_env.is_none() {
+            return Objects::Error(ErrorObject::new("Invalid number of arguments to function".into()));
+        }
+        let mut extended_env = extended_env.unwrap();
+        let evaluated = eval_block_statement(func.body(), &mut extended_env);
+        return evaluated.expect("Expected an Objects value but evaluated to None");
+    } else {
+        Objects::Error(ErrorObject::new(format!("not a function: {}", func.obj_type()).into()))
+    }
+}
+
+fn extend_function_env(func: &Function, args: Vec<Objects>) -> Option<Environment> {
+    let mut extended_env = Environment::new_enclosed_environment(func.environment().clone());
+    for (i, p) in func.parameters().iter().enumerate() {
+        let next = args.get(i)?;
+        extended_env.set(p.value().into(), next.clone());
+    }
+    Some(extended_env)
+}
+
+fn eval_expressions(expressions: &[Expressions], env: &mut Environment) -> Vec<Objects> {
+    let mut v = Vec::new();
+    for ex in expressions{
+        let evaluated = eval_expression(ex, env);
+        if evaluated.is_err() {
+            return [evaluated].to_vec();
+        }
+        v.push(evaluated);
+    }
+    v
 }
 
 fn eval_bang_operator_expression(exp: &Objects) -> Objects {
@@ -280,14 +330,16 @@ mod test {
     }
 
     fn test_int(obj: &Objects, exp: &isize) {
-        let obj = obj.clone()
+        let obj = obj
+            .clone()
             .as_integer()
             .expect(format!("Object was not an Integer. It was a {}", obj).as_str());
         assert_eq!(exp, obj.value());
     }
 
     fn test_bool(obj: &Objects, exp: &bool) {
-        let obj = obj.clone()
+        let obj = obj
+            .clone()
             .as_boolean()
             .expect(format!("Object was not an Boolean. It was a {}", obj).as_str());
         assert_eq!(exp, obj.value());
@@ -508,6 +560,58 @@ mod test {
             let evaluated = test_eval(s);
             if let Some(evaluated) = evaluated {
                 test_int(&evaluated, &exp);
+            } else {
+                assert!(false, "No output");
+            }
+        }
+    }
+
+    #[test]
+    fn test_function_object() {
+        let input = "fn(x) {x + 2};";
+        let evaluated = test_eval(input);
+        if let Some(evaluated) = evaluated {
+            let fn_object = evaluated
+                .clone()
+                .as_fn()
+                .expect(format!("Expected Function, received: {}", evaluated).as_str());
+            assert_eq!(1, fn_object.parameters().len());
+            assert_eq!(
+                "x",
+                fn_object
+                    .parameters()
+                    .get(0)
+                    .expect("Expected a value in parameters")
+                    .to_string()
+            );
+            let expected_body = "(x + 2)";
+            assert_eq!(expected_body, fn_object.body().to_string());
+        } else {
+            assert!(false, "No output")
+        }
+    }
+
+    #[test]
+    fn test_function_application() {
+        let inputs = [
+            ("let identity = fn(x) {x;}; identity(5);", 5),
+            ("let identity = fn(x) { return x; }; identity(5);", 5),
+            ("let double = fn(x) { x * 2; }; double(5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20),
+            ("fn(x) { x; }(5)", 5),
+        ];
+
+        for (input, exp) in inputs {
+            let evaluated = test_eval(input);
+            if let Some(evaluated) = evaluated {
+                match evaluated {
+                    Objects::Return(x) => test_int(&x.value(), &exp),
+                    Objects::Integer(_) => test_int(&evaluated, &exp),
+                    _ => {
+                        panic!("Expected integer. Received: {}", evaluated.obj_type())
+                    }
+                }
             } else {
                 assert!(false, "No output");
             }

@@ -2,7 +2,7 @@ use super::{Expressions, OptionalBlockStatement};
 use crate::ast::{block_statement::BlockStatement, Expression, Node, Token};
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct IfExpression {
     token: Token,
     condition: Box<Expressions>,

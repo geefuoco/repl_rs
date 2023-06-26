@@ -1,7 +1,7 @@
 use crate::ast::{Expression, Node, Token};
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct IntegerLiteral {
     token: Token,
     value: isize,
