@@ -76,13 +76,6 @@ impl Parser {
         self.curr_token = self.peek_token.take();
         let tok = self.lexer.next_token();
         self.peek_token = Some(tok);
-        if self
-            .curr_token
-            .clone()
-            .is_some_and(|x| x == Token::DoubleQuote)
-        {
-            self.next_token();
-        }
     }
 
     pub fn parse_program(&mut self) -> Result<Program, Box<dyn Error>> {
@@ -149,6 +142,10 @@ impl Parser {
         self.register_infix(Token::Lt.token_type(), Parser::parse_infix_expression);
         self.register_infix(Token::Gt.token_type(), Parser::parse_infix_expression);
         self.register_infix(Token::Lparen.token_type(), Parser::parse_call_expression);
+        self.register_infix(
+            Token::String(String::new()).token_type(),
+            Parser::parse_infix_expression,
+        );
     }
 
     fn register_prefix_fns(&mut self) {
@@ -272,7 +269,13 @@ impl Parser {
             return None;
         }
         let token_type = self.curr_token.as_mut()?.token_type();
-        let prefix_func = self.prefix_parse_fns.get(&token_type)?;
+        let prefix_func = self.prefix_parse_fns.get(&token_type);
+        if prefix_func.is_none() {
+            self.errors
+                .push(format!("Prefix func for {} is not defined. ", &token_type));
+            return None;
+        }
+        let prefix_func = prefix_func.unwrap();
         let mut left_exp = prefix_func(self);
 
         while self.peek_token != Some(Token::Semicolon) && precedence < self.peek_precedence() {

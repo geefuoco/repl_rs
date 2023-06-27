@@ -255,6 +255,10 @@ fn eval_infix_expression(operator: &str, left: Objects, right: Objects) -> Objec
         let left = left.as_integer().unwrap();
         let right = right.as_integer().unwrap();
         return eval_integer_infix_expression(operator, &left, &right);
+    } else if left.obj_type() == ObjectTypes::String && right.obj_type() == ObjectTypes::String {
+        let left = left.as_str().expect("Could not cast to String");
+        let right = right.as_str().expect("Could not cast to String");
+        return eval_string_infix_expression(operator, &left, &right);
     } else if operator == "==" {
         let left = left.as_boolean().expect("Could not cast to Boolean");
         let right = right.as_boolean().expect("Could not cast to Boolean");
@@ -273,6 +277,20 @@ fn eval_infix_expression(operator: &str, left: Objects, right: Objects) -> Objec
             "unknown operator: {} {} {}",
             left, operator, right
         )))
+    }
+}
+
+fn eval_string_infix_expression(
+    operator: &str,
+    left: &StringObject,
+    right: &StringObject,
+) -> Objects {
+    match operator {
+        "+" => Objects::String(StringObject::new(format!("{}{}", &left.value(), &right.value()))),
+        _ => Objects::Error(ErrorObject::new(format!(
+            "unknown operator: {} {} {}",
+            left, operator, right
+        ))),
     }
 }
 
@@ -539,6 +557,7 @@ mod test {
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
             ("foobar", "identifier not found: foobar"),
+            (r#""hello" - "world""#, "unknown operator: STRING - STRING"),
         ];
 
         for (s, exp) in inputs {
@@ -653,6 +672,18 @@ mod test {
                     .as_str()
                     .expect("Expected was not a StringObject");
                 assert_eq!("Hello World", ev.value());
+            }
+            None => assert!(false, "No output"),
+        }
+    }
+
+    #[test]
+    fn test_string_concatenation() {
+        let input = r#""hello" + " " + "world""#;
+        match test_eval(input) {
+            Some(ev) => {
+                let ev = ev.as_str().expect("Object was not a string literal");
+                assert_eq!("hello world", ev.value());
             }
             None => assert!(false, "No output"),
         }

@@ -33,7 +33,6 @@ pub enum Token {
     Multiply,
     Bang,
     SingleQuote,
-    DoubleQuote,
     Eof,
     #[default]
     Illegal,
@@ -73,7 +72,6 @@ impl Token {
             Token::Multiply => "*",
             Token::Bang => "!",
             Token::SingleQuote => "'",
-            Token::DoubleQuote => "\"",
             Token::Eof => "EOF",
             Token::Illegal => "Illegal",
         }
@@ -112,7 +110,6 @@ impl Token {
             Token::Multiply => String::from("Multiply"),
             Token::Bang => String::from("Bang"),
             Token::SingleQuote => String::from("SingleQuote"),
-            Token::DoubleQuote => String::from("DoubleQuote"),
             Token::Eof => String::from("Eof"),
             Token::Illegal => String::from("Illegal"),
         }
@@ -132,8 +129,6 @@ pub struct Lexer {
     position: usize,
     input: Vec<u8>,
     ch: u8,
-    parsing_string: bool,
-    prev_token_string: bool,
 }
 
 impl Lexer {
@@ -143,8 +138,6 @@ impl Lexer {
             read_position: 0,
             input: input.into_bytes(),
             ch: 0,
-            parsing_string: false,
-            prev_token_string: false,
         };
         l.read_char();
         l
@@ -152,10 +145,6 @@ impl Lexer {
 
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
-        if self.parsing_string {
-            let value = self.read_str();
-            return Token::String(value.into());
-        }
         let tok = match self.ch {
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
                 let ident = self.read_ident();
@@ -185,12 +174,8 @@ impl Lexer {
             b';' => Token::Semicolon,
             b',' => Token::Comma,
             b'"' => {
-                if !self.prev_token_string {
-                    self.parsing_string = true;
-                } else {
-                    self.prev_token_string = false;
-                }
-                Token::DoubleQuote
+                self.read_char();
+                return Token::String(self.read_str().into());
             }
             b'=' => match self.peek() {
                 b'=' => {
@@ -272,9 +257,8 @@ impl Lexer {
         while &self.ch != &b'"' && self.ch != 0 {
             self.read_char();
         }
-        self.parsing_string = false;
-        self.prev_token_string = true;
-        match std::str::from_utf8(&self.input[pos..self.position]) {
+        self.read_char();
+        match std::str::from_utf8(&self.input[pos..self.position - 1]) {
             Ok(valid) => valid,
             _ => panic!("Non UTF-8 Character encounterd"),
         }
@@ -350,9 +334,9 @@ mod tests {
             Token::Let,
             Token::Ident("string".into()),
             Token::Assign,
-            Token::DoubleQuote,
+            // Token::DoubleQuote,
             Token::String("hello".into()),
-            Token::DoubleQuote,
+            // Token::DoubleQuote,
             Token::Semicolon,
             Token::Let,
             Token::Ident("ch".into()),
@@ -456,23 +440,23 @@ mod tests {
             Token::Let,
             Token::Ident("x".into()),
             Token::Assign,
-            Token::DoubleQuote,
+            // Token::DoubleQuote,
             Token::String("hello".into()),
-            Token::DoubleQuote,
+            // Token::DoubleQuote,
             Token::Semicolon,
             Token::Let,
             Token::Ident("y".into()),
             Token::Assign,
-            Token::DoubleQuote,
+            // Token::DoubleQuote,
             Token::String("world!".into()),
-            Token::DoubleQuote,
+            // Token::DoubleQuote,
             Token::Semicolon,
             Token::Let,
             Token::Ident("test".into()),
             Token::Assign,
-            Token::DoubleQuote,
+            // Token::DoubleQuote,
             Token::String("'abc123_!@#$%^&*(){};".into()),
-            Token::DoubleQuote,
+            // Token::DoubleQuote,
             Token::Semicolon,
         ];
 
