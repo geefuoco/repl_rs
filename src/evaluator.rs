@@ -14,6 +14,7 @@ use crate::object::Object;
 use crate::object::ObjectTypes;
 use crate::object::Objects;
 use crate::object::Return;
+use crate::object::StringObject;
 
 const TRUE: Boolean = Boolean { value: true };
 const FALSE: Boolean = Boolean { value: false };
@@ -168,6 +169,9 @@ fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
             }
             return apply_function(func, arguments);
         }
+        Expressions::StringLiteral(value) => {
+            Objects::String(StringObject::new(value.value().into()))
+        }
         _ => Objects::Null(NULL),
     }
 }
@@ -176,13 +180,17 @@ fn apply_function(func: Objects, arguments: Vec<Objects>) -> Objects {
     if let Some(func) = func.clone().as_fn() {
         let extended_env = extend_function_env(&func, arguments);
         if extended_env.is_none() {
-            return Objects::Error(ErrorObject::new("Invalid number of arguments to function".into()));
+            return Objects::Error(ErrorObject::new(
+                "Invalid number of arguments to function".into(),
+            ));
         }
         let mut extended_env = extended_env.unwrap();
         let evaluated = eval_block_statement(func.body(), &mut extended_env);
         return evaluated.expect("Expected an Objects value but evaluated to None");
     } else {
-        Objects::Error(ErrorObject::new(format!("not a function: {}", func.obj_type()).into()))
+        Objects::Error(ErrorObject::new(
+            format!("not a function: {}", func.obj_type()).into(),
+        ))
     }
 }
 
@@ -197,7 +205,7 @@ fn extend_function_env(func: &Function, args: Vec<Objects>) -> Option<Environmen
 
 fn eval_expressions(expressions: &[Expressions], env: &mut Environment) -> Vec<Objects> {
     let mut v = Vec::new();
-    for ex in expressions{
+    for ex in expressions {
         let evaluated = eval_expression(ex, env);
         if evaluated.is_err() {
             return [evaluated].to_vec();
@@ -615,6 +623,38 @@ mod test {
             } else {
                 assert!(false, "No output");
             }
+        }
+    }
+
+    #[test]
+    fn test_closure() {
+        let input = r#"
+        let newAdder = fn(x) {
+            fn(y) {x + y}
+        }
+        let addTwo = newAdder(2);
+        addTwo(2);
+        "#;
+        let evaluated = test_eval(input);
+        if let Some(evaluated) = evaluated {
+            test_int(&evaluated, &4);
+        } else {
+            assert!(false, "No output");
+        }
+    }
+
+    #[test]
+    fn test_string_object() {
+        let input = r#""Hello World""#;
+        match test_eval(input) {
+            Some(ev) => {
+                let ev = ev
+                    .clone()
+                    .as_str()
+                    .expect("Expected was not a StringObject");
+                assert_eq!("Hello World", ev.value());
+            }
+            None => assert!(false, "No output"),
         }
     }
 }

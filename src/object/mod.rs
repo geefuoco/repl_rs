@@ -10,6 +10,7 @@ mod integer;
 mod null;
 mod return_object;
 mod function;
+mod string_object;
 pub use boolean::Boolean;
 pub use environment::Environment;
 pub use error::Error as ErrorObject;
@@ -17,6 +18,7 @@ pub use function::Function;
 pub use integer::Integer;
 pub use null::Null;
 pub use return_object::Return;
+pub use string_object::StringObject;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Objects {
@@ -25,7 +27,8 @@ pub enum Objects {
     Null(Null),
     Return(Return),
     Error(ErrorObject),
-    Function(Function)
+    Function(Function),
+    String(StringObject)
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -35,7 +38,8 @@ pub enum ObjectTypes {
     Null,
     Return,
     Error,
-    Function
+    Function,
+    String
 }
 
 impl Display for ObjectTypes {
@@ -46,7 +50,8 @@ impl Display for ObjectTypes {
             ObjectTypes::Null => write!(f, "NULL"),
             ObjectTypes::Return => write!(f, "RETURN"),
             ObjectTypes::Error => write!(f, "ERROR"),
-            ObjectTypes::Function => write!(f, "FUNCTION")
+            ObjectTypes::Function => write!(f, "FUNCTION"),
+            ObjectTypes::String => write!(f, "STRING")
         }
     }
 }
@@ -59,7 +64,8 @@ impl Display for Objects {
             Objects::Null(x) => write!(f, "{}", x.obj_type()),
             Objects::Return(x) => write!(f, "{}", x.obj_type()),
             Objects::Error(x) => write!(f, "{}", x.obj_type()),
-            Objects::Function(x) => write!(f, "{}", x.obj_type())
+            Objects::Function(x) => write!(f, "{}", x.obj_type()),
+            Objects::String(x) => write!(f, "{}", x.obj_type())
         }
     }
 }
@@ -101,6 +107,12 @@ impl Objects {
             _ => None,
         }
     }
+    pub fn as_str(self) -> Option<StringObject> {
+        match self {
+            Objects::String(x) => Some(x),
+            _ => None
+        }
+    }
 }
 
 impl Object for Objects {
@@ -112,6 +124,7 @@ impl Object for Objects {
             Objects::Return(x) => x.obj_type(),
             Objects::Error(x) => x.obj_type(),
             Objects::Function(x) => x.obj_type(),
+            Objects::String(x) => x.obj_type(),
         }
     }
 
@@ -122,7 +135,8 @@ impl Object for Objects {
             Objects::Null(x) => x.inspect(),
             Objects::Return(x) => x.inspect(),
             Objects::Error(x) => x.inspect(),
-            Objects::Function(x) => x.inspect()
+            Objects::Function(x) => x.inspect(),
+            Objects::String(x) => x.inspect()
         }
     }
 

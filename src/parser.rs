@@ -10,6 +10,7 @@ use crate::ast::LetStatement;
 use crate::ast::OptionalBlockStatement;
 use crate::ast::PrefixExpression;
 use crate::ast::ReturnStatement;
+use crate::ast::StringLiteral;
 use crate::{
     ast::{Expressions, Identifier, Program, Statements},
     lexer::{Lexer, Token},
@@ -75,6 +76,13 @@ impl Parser {
         self.curr_token = self.peek_token.take();
         let tok = self.lexer.next_token();
         self.peek_token = Some(tok);
+        if self
+            .curr_token
+            .clone()
+            .is_some_and(|x| x == Token::DoubleQuote)
+        {
+            self.next_token();
+        }
     }
 
     pub fn parse_program(&mut self) -> Result<Program, Box<dyn Error>> {
@@ -87,7 +95,12 @@ impl Parser {
                     if let Some(statement) = statement {
                         program.statements.push(statement);
                     } else {
-                        println!("{}", self.errors().get(0).unwrap());
+                        println!(
+                            "{}",
+                            self.errors()
+                                .get(0)
+                                .expect("Error occured when parsing the program.")
+                        );
                     }
                     self.next_token();
                 }
@@ -154,6 +167,10 @@ impl Parser {
         self.register_prefix(Token::Lparen.token_type(), Parser::parse_grouped_expression);
         self.register_prefix(Token::If.token_type(), Parser::parse_if_expression);
         self.register_prefix(Token::Function.token_type(), Parser::parse_function_literal);
+        self.register_prefix(
+            Token::String(String::new()).token_type(),
+            Parser::parse_string_literal,
+        );
     }
 
     fn parse_statement(&mut self) -> Option<Statements> {
@@ -453,6 +470,15 @@ impl Parser {
         }
         Some(v)
     }
+
+    fn parse_string_literal(&mut self) -> Option<Expressions> {
+        let tok = self
+            .curr_token
+            .clone()
+            .expect("expected current token to exist");
+        let literal = tok.clone().literal().to_string();
+        Some(Expressions::StringLiteral(StringLiteral::new(tok, literal)))
+    }
 }
 
 #[cfg(test)]
@@ -534,12 +560,16 @@ mod tests {
 
     fn test_infix_expression(expression: &InfixExpression, left: Types, op: &str, right: Types) {
         match left {
-            Types::String(x) => test_literal(expression.expression_left().clone(), Types::String(x)),
+            Types::String(x) => {
+                test_literal(expression.expression_left().clone(), Types::String(x))
+            }
             Types::Isize(x) => test_literal(expression.expression_left().clone(), Types::Isize(x)),
             Types::Bool(x) => test_literal(expression.expression_left().clone(), Types::Bool(x)),
         }
         match right {
-            Types::String(x) => test_literal(expression.expression_right().clone(), Types::String(x)),
+            Types::String(x) => {
+                test_literal(expression.expression_right().clone(), Types::String(x))
+            }
             Types::Isize(x) => test_literal(expression.expression_right().clone(), Types::Isize(x)),
             Types::Bool(x) => test_literal(expression.expression_right().clone(), Types::Bool(x)),
         }
@@ -554,8 +584,12 @@ mod tests {
             }
         }
         match value {
-            Types::String(x) => test_literal(return_statement.return_value().clone(), Types::String(x)),
-            Types::Isize(x) => test_literal(return_statement.return_value().clone(), Types::Isize(x)),
+            Types::String(x) => {
+                test_literal(return_statement.return_value().clone(), Types::String(x))
+            }
+            Types::Isize(x) => {
+                test_literal(return_statement.return_value().clone(), Types::Isize(x))
+            }
             Types::Bool(x) => test_literal(return_statement.return_value().clone(), Types::Bool(x)),
         }
     }
@@ -745,7 +779,8 @@ mod tests {
                 );
             assert_eq!(prefix.operator(), exp.1);
             let boolean = prefix
-                .expression_right().clone()
+                .expression_right()
+                .clone()
                 .as_boolean_literal()
                 .expect("expression was not an boolean literal");
             test_bool(&boolean, exp.2);
@@ -757,19 +792,25 @@ mod tests {
         for exp in v {
             let program = test_helper(exp.0);
             let statement = program.statements.get(0).unwrap();
-            let statement = statement.clone()
+            let statement = statement
+                .clone()
                 .as_expression_statement()
                 .expect("Statement was not an expression statement");
-            let prefix = statement.expression().clone().as_prefix_expression().expect(
-                format!(
-                    "expression was a {}, expected a prefix expression",
-                    statement
-                )
-                .as_str(),
-            );
+            let prefix = statement
+                .expression()
+                .clone()
+                .as_prefix_expression()
+                .expect(
+                    format!(
+                        "expression was a {}, expected a prefix expression",
+                        statement
+                    )
+                    .as_str(),
+                );
             assert_eq!(prefix.operator(), exp.1);
             let integer = prefix
-                .expression_right().clone()
+                .expression_right()
+                .clone()
                 .as_integer_literal()
                 .expect("expression was not an integer literal");
             test_integer(&integer, exp.2);
@@ -786,11 +827,13 @@ mod tests {
         for exp in v {
             let program = test_helper(exp.0);
             let statement = program.statements.get(0).unwrap();
-            let statement = statement.clone()
+            let statement = statement
+                .clone()
                 .as_expression_statement()
                 .expect("Statement was not an expression statement");
             let infix = statement
-                .expression().clone()
+                .expression()
+                .clone()
                 .as_infix_expression()
                 .expect("expression was not an infix expression");
             test_infix_expression(&*infix, Types::Bool(exp.1), exp.2, Types::Bool(exp.3));
@@ -812,11 +855,13 @@ mod tests {
         for exp in v {
             let program = test_helper(exp.0);
             let statement = program.statements.get(0).unwrap();
-            let statement = statement.clone()
+            let statement = statement
+                .clone()
                 .as_expression_statement()
                 .expect("Statement was not an expression statement");
             let infix = statement
-                .expression().clone()
+                .expression()
+                .clone()
                 .as_infix_expression()
                 .expect("expression was not an infix expression");
             test_infix_expression(&*infix, Types::Isize(exp.1), exp.2, Types::Isize(exp.3));
@@ -878,15 +923,18 @@ mod tests {
         let input = "if (x < y) { x }";
         let program = test_helper(input);
         let statement = program.statements.get(0).expect("Could not find statement");
-        let statement = statement.clone()
+        let statement = statement
+            .clone()
             .as_expression_statement()
             .expect("Statement was not an expression statement");
         let if_expression = statement
-            .expression().clone()
+            .expression()
+            .clone()
             .as_if_expression()
             .expect("expression was not an if expression");
         let condition = if_expression
-            .condition().clone()
+            .condition()
+            .clone()
             .as_infix_expression()
             .expect("expression was not an infix expression");
         test_infix_expression(&*condition, Types::String("x"), "<", Types::String("y"));
@@ -894,11 +942,13 @@ mod tests {
             .consequence()
             .statements()
             .get(0)
-            .expect("Could not get statement").clone()
+            .expect("Could not get statement")
+            .clone()
             .as_expression_statement()
             .expect("Could not convert into ExpressionStatement");
         let ident = consequence
-            .expression().clone()
+            .expression()
+            .clone()
             .as_identifier()
             .expect("Could not convert into ExpressionStatement");
         test_ident(&ident, "x");
@@ -910,15 +960,19 @@ mod tests {
         let input = "if (x < y) { x } else { y }";
         let program = test_helper(input);
         let statement = program.statements.get(0).expect("Could not find statement");
-        let statement = statement.clone()
-            .as_expression_statement().clone()
+        let statement = statement
+            .clone()
+            .as_expression_statement()
+            .clone()
             .expect("Statement was not an expression statement");
         let if_expression = statement
-            .expression().clone()
+            .expression()
+            .clone()
             .as_if_expression()
             .expect("expression was not an if expression");
         let condition = if_expression
-            .condition().clone()
+            .condition()
+            .clone()
             .as_infix_expression()
             .expect("expression was not an infix expression");
         test_infix_expression(&*condition, Types::String("x"), "<", Types::String("y"));
@@ -926,23 +980,28 @@ mod tests {
             .consequence()
             .statements()
             .get(0)
-            .expect("Could not get statement").clone()
+            .expect("Could not get statement")
+            .clone()
             .as_expression_statement()
             .expect("Could not convert into ExpressionStatement");
         let ident = consequence
-            .expression().clone()
+            .expression()
+            .clone()
             .as_identifier()
             .expect("Could not convert into Identifier");
         test_ident(&ident, "x");
         let alternative = if_expression
-            .alternative().clone()
+            .alternative()
+            .clone()
             .expect("Expected there to be an else block")
             .statements()
             .get(0)
-            .expect("Could not get statement").clone()
+            .expect("Could not get statement")
+            .clone()
             .as_expression_statement()
             .expect("Could not convert into ExpressionStatement")
-            .expression().clone()
+            .expression()
+            .clone()
             .as_identifier()
             .expect("Could not convert into Identifier");
         test_ident(&alternative, "y");
@@ -953,11 +1012,13 @@ mod tests {
         let input = "fn(x, y) { x + y }";
         let program = test_helper(input);
         let statement = program.statements.get(0).unwrap();
-        let statement = statement.clone()
+        let statement = statement
+            .clone()
             .as_expression_statement()
             .expect("Statement was not an expression statement");
         let fn_literal = statement
-            .expression().clone()
+            .expression()
+            .clone()
             .as_function_literal()
             .expect("expression was not a function literal");
         assert_eq!(fn_literal.parameters().len(), 2);
@@ -968,10 +1029,12 @@ mod tests {
             .body()
             .statements()
             .get(0)
-            .unwrap().clone()
+            .unwrap()
+            .clone()
             .as_expression_statement()
             .expect("Should be an expression statement i hope")
-            .expression().clone()
+            .expression()
+            .clone()
             .as_infix_expression()
             .expect("expression was not an infix expression");
         test_infix_expression(&infix, Types::String("x"), "+", Types::String("y"));
@@ -988,11 +1051,13 @@ mod tests {
         for (input, expected) in inputs {
             let program = test_helper(input);
             let statement = program.statements.get(0).unwrap();
-            let statement = statement.clone()
+            let statement = statement
+                .clone()
                 .as_expression_statement()
                 .expect("Statement was not an expression statement");
             let fn_literal = statement
-                .expression().clone()
+                .expression()
+                .clone()
                 .as_function_literal()
                 .expect("expression was not a function literal");
             assert_eq!(expected.len(), fn_literal.parameters().len());
@@ -1007,34 +1072,59 @@ mod tests {
         let input = "add(1, 2 * 3, 4 + 5)";
         let program = test_helper(input);
         let statement = program.statements.get(0).unwrap();
-        let statement = statement.clone()
+        let statement = statement
+            .clone()
             .as_expression_statement()
             .expect("Statement was not an expression statement");
         let call_expression = statement
-            .expression().clone()
+            .expression()
+            .clone()
             .as_call_expression()
             .expect("ExpressionStatement was not a CallExpression");
         let ident = call_expression
-            .function().clone()
+            .function()
+            .clone()
             .as_identifier()
             .expect("function was not an Identifier");
         test_ident(&ident, "add");
         assert_eq!(call_expression.arguments().len(), 3);
 
-        test_literal(call_expression.arguments().get(0).unwrap().clone(), Types::Isize(1));
+        test_literal(
+            call_expression.arguments().get(0).unwrap().clone(),
+            Types::Isize(1),
+        );
         let first_infix = call_expression
             .arguments()
             .get(1)
-            .unwrap().clone()
+            .unwrap()
+            .clone()
             .as_infix_expression()
             .expect("argument was not an InifixExpression");
         test_infix_expression(&first_infix, Types::Isize(2), "*", Types::Isize(3));
         let second_infix = call_expression
             .arguments()
             .get(2)
-            .unwrap().clone()
+            .unwrap()
+            .clone()
             .as_infix_expression()
             .expect("argument was not an InifixExpression");
         test_infix_expression(&second_infix, Types::Isize(4), "+", Types::Isize(5));
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let input = r#""hello world""#;
+
+        let mut program = test_helper(input);
+        let statement = program.statements.remove(0);
+        let statement = statement
+            .as_expression_statement()
+            .expect("Expected expression statement");
+        let str_literal = statement
+            .expression()
+            .clone()
+            .as_string_literal()
+            .expect("argument was not a string literal");
+        assert_eq!("hello world", str_literal.value());
     }
 }

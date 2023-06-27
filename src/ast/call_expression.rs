@@ -53,6 +53,7 @@ impl Display for CallExpression {
             Expressions::InfixExpression(x) => String::from(x.token_literal()),
             Expressions::PrefixExpression(x) => String::from(x.token_literal()),
             Expressions::CallExpression(x) => String::from(x.token_literal()),
+            Expressions::StringLiteral(x) => String::from(x.token_literal()),
             Expressions::FunctionLiteral(x) => String::from(x.token_literal()),
         };
         write!(f, "{}(", context)?;

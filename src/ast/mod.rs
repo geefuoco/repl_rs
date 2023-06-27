@@ -13,6 +13,7 @@ pub mod integer_literal;
 pub mod let_statement;
 pub mod prefix_expression;
 pub mod return_statement;
+pub mod string_literal;
 
 pub use block_statement::BlockStatement;
 pub use boolean_literal::BooleanLiteral;
@@ -26,6 +27,7 @@ pub use integer_literal::IntegerLiteral;
 pub use let_statement::LetStatement;
 pub use prefix_expression::PrefixExpression;
 pub use return_statement::ReturnStatement;
+pub use string_literal::StringLiteral;
 
 #[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
 pub enum Expressions {
@@ -37,6 +39,7 @@ pub enum Expressions {
     PrefixExpression(Box<PrefixExpression>),
     CallExpression(Box<CallExpression>),
     FunctionLiteral(FunctionLiteral),
+    StringLiteral(StringLiteral),
     #[default]
     Empty,
 }
@@ -93,6 +96,12 @@ impl Expressions {
             _ => None,
         }
     }
+    pub fn as_string_literal(self) -> Option<StringLiteral> {
+        match self {
+            Expressions::StringLiteral(x) => Some(x),
+            _ => None,
+        }
+    }
 }
 
 impl Display for Expressions {
@@ -106,6 +115,7 @@ impl Display for Expressions {
             Expressions::PrefixExpression(x) => write!(f, "{}", x),
             Expressions::CallExpression(x) => write!(f, "{}", x),
             Expressions::FunctionLiteral(x) => write!(f, "{}", x),
+            Expressions::StringLiteral(x) => write!(f, "{}", x),
             Expressions::Empty => panic!("Cannot display an empty expression"),
         }
     }
