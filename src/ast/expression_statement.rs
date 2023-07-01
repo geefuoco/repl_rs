@@ -3,16 +3,26 @@ use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct ExpressionStatement {
-    token: Token,
     expression: Expressions,
 }
 
 impl ExpressionStatement {
-    pub fn new(token: Token, expression: Expressions) -> Self {
-        Self { token, expression }
+    pub fn new(expression: Expressions) -> Self {
+        Self { expression }
     }
     pub fn token(&self) -> &Token {
-        &self.token
+        match &self.expression {
+            Expressions::Identifier(x) => x.token(),
+            Expressions::BooleanLiteral(x) => x.token(),
+            Expressions::IntegerLiteral(x) => x.token(),
+            Expressions::IfExpression(x) => x.token(),
+            Expressions::InfixExpression(x) => x.token(),
+            Expressions::PrefixExpression(x) => x.token(),
+            Expressions::CallExpression(x) => x.token(),
+            Expressions::FunctionLiteral(x) => x.token(),
+            Expressions::StringLiteral(x) => x.token(),
+            Expressions::Empty => panic!("Token was empty"),
+        }
     }
 
     pub fn expression(&self) -> &Expressions {
@@ -28,7 +38,7 @@ impl Statement for ExpressionStatement {
 
 impl Node for ExpressionStatement {
     fn token_literal(&self) -> &str {
-        self.token.literal()
+        self.token().literal()
     }
 }
 

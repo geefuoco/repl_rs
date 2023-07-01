@@ -131,7 +131,7 @@ fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
                 return Objects::Boolean(FALSE);
             }
         }
-        Expressions::IntegerLiteral(value) => Objects::Integer(Integer::new(*value.value())),
+        Expressions::IntegerLiteral(value) => Objects::Integer(Integer::new(value.value())),
         Expressions::IfExpression(value) => {
             eval_if_expression(value, env).expect("could not evaluate if expression")
         }
@@ -286,7 +286,11 @@ fn eval_string_infix_expression(
     right: &StringObject,
 ) -> Objects {
     match operator {
-        "+" => Objects::String(StringObject::new(format!("{}{}", &left.value(), &right.value()))),
+        "+" => Objects::String(StringObject::new(format!(
+            "{}{}",
+            &left.value(),
+            &right.value()
+        ))),
         _ => Objects::Error(ErrorObject::new(format!(
             "unknown operator: {} {} {}",
             left, operator, right

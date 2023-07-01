@@ -4,12 +4,14 @@ use std::fmt::Display;
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Identifier {
     token: Token,
-    value: String,
 }
 
 impl Identifier {
-    pub fn new(token: Token, value: String) -> Self {
-        Self { token, value }
+    pub fn new(token: Token) -> Self {
+        match token  {
+            Token::Ident(_) =>Self { token },
+            _ => panic!("Tried to make an identifier with a {} token", token)
+        }
     }
 
     pub fn token(&self) -> &Token {
@@ -17,7 +19,7 @@ impl Identifier {
     }
 
     pub fn value(&self) -> &str {
-        self.value.as_ref()
+        self.token_literal()
     }
 }
 

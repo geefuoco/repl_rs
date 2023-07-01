@@ -110,7 +110,7 @@ impl Parser {
         if let Some(v) = self.precedences.get(
             &self
                 .curr_token
-                .clone()
+                .as_ref()
                 .expect("could not peek precendence becasuse token was none")
                 .token_type(),
         ) {
@@ -123,7 +123,7 @@ impl Parser {
         if let Some(v) = self.precedences.get(
             &self
                 .peek_token
-                .clone()
+                .as_ref()
                 .expect("could not peek precendence becasuse token was none")
                 .token_type(),
         ) {
@@ -181,11 +181,7 @@ impl Parser {
     }
 
     fn parse_return_statement(&mut self) -> Option<Statements> {
-        let return_token = self.curr_token.clone();
-        if return_token.is_none() {
-            return None;
-        }
-        let return_token = return_token.unwrap();
+        let return_token = self.curr_token.take().unwrap();
         self.next_token();
         let return_value = self.parse_expression(Priority::Lowest)?;
         if self.peek_token == Some(Token::Semicolon) {
@@ -198,16 +194,12 @@ impl Parser {
     }
 
     fn parse_let_statement(&mut self) -> Option<Statements> {
-        let let_token = self.curr_token.clone()?;
+        let let_token = self.curr_token.take().unwrap();
         if !self.expect_peek(Token::Ident("".into())) {
             return None;
         }
-        let ident_token = self.curr_token.clone()?;
-        let ident_literal = match &ident_token {
-            Token::Ident(value) => value.clone(),
-            _ => unreachable!(),
-        };
-        let ident = Identifier::new(ident_token, ident_literal);
+        let ident_token = self.curr_token.take().unwrap();
+        let ident = Identifier::new(ident_token);
 
         if !self.expect_peek(Token::Assign) {
             return None;
@@ -256,7 +248,7 @@ impl Parser {
     fn parse_expression_statement(&mut self) -> Option<Statements> {
         let expression = self.parse_expression(Priority::Lowest)?;
 
-        let stmt = ExpressionStatement::new(self.curr_token.take()?, expression);
+        let stmt = ExpressionStatement::new(expression);
 
         if self.peek_token == Some(Token::Semicolon) {
             self.next_token();
@@ -265,9 +257,6 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precedence: Priority) -> Option<Expressions> {
-        if self.curr_token.is_none() {
-            return None;
-        }
         let token_type = self.curr_token.as_mut()?.token_type();
         let prefix_func = self.prefix_parse_fns.get(&token_type);
         if prefix_func.is_none() {
@@ -282,13 +271,11 @@ impl Parser {
             if self.peek_token.is_none() {
                 return left_exp;
             }
-            let peek_token_type = self.peek_token.as_mut().unwrap().token_type();
+            let peek_token_type = self.peek_token.as_ref().unwrap().token_type();
             let infix_func = self
                 .infix_parse_fns
                 .get(&peek_token_type)
-                .expect(format!("Could not find function with key: {}", peek_token_type).as_str())
-                .clone();
-            self.next_token();
+                .expect(format!("Could not find function with key: {}", peek_token_type).as_str());
             left_exp = infix_func(self, left_exp?);
         }
         left_exp
@@ -297,7 +284,7 @@ impl Parser {
     fn parse_if_expression(&mut self) -> Option<Expressions> {
         match self.expect_peek(Token::Lparen) {
             true => {
-                let curr_token = self.curr_token.clone()?;
+                let curr_token = self.curr_token.take()?;
                 self.next_token();
                 let condition = self.parse_expression(Priority::Lowest)?;
                 if !self.expect_peek(Token::Rparen) {
@@ -328,7 +315,7 @@ impl Parser {
 
     fn parse_block_statement(&mut self) -> Option<BlockStatement> {
         let mut v = Vec::new();
-        let curr_token = self.curr_token.clone()?;
+        let curr_token = self.curr_token.take()?;
         self.next_token();
         while self.curr_token != Some(Token::Rbrace) && self.curr_token != Some(Token::Eof) {
             let stmt = self.parse_statement();
@@ -351,57 +338,44 @@ impl Parser {
     }
 
     fn parse_identifier(&mut self) -> Option<Expressions> {
-        let tok = self.curr_token.as_ref()?;
-        let literal = tok.literal();
-        Some(Expressions::Identifier(Identifier::new(
-            tok.clone(),
-            literal.into(),
-        )))
+        let tok = self.curr_token.take().unwrap();
+        Some(Expressions::Identifier(Identifier::new(tok)))
     }
 
     fn parse_integer_literal(&mut self) -> Option<Expressions> {
-        let tok = self.curr_token.as_ref()?;
-        let literal = tok
-            .literal()
-            .parse::<isize>()
-            .expect("Type was not a number");
-        Some(Expressions::IntegerLiteral(IntegerLiteral::new(
-            tok.clone(),
-            literal,
-        )))
+        let tok = self.curr_token.take()?;
+        Some(Expressions::IntegerLiteral(IntegerLiteral::new(tok)))
     }
 
     fn parse_boolean(&mut self) -> Option<Expressions> {
-        let tok = self.curr_token.as_ref()?;
-        let literal = tok.literal().parse::<bool>().expect("type was not a bool");
+        let tok = self.curr_token.take()?;
         Some(Expressions::BooleanLiteral(BooleanLiteral::new(
-            tok.clone(),
-            literal,
+            tok,
         )))
     }
     fn parse_prefix_expression(&mut self) -> Option<Expressions> {
-        let tok = self.curr_token.as_ref()?.clone();
-        let literal = String::from(tok.literal());
+        let tok = self.curr_token.take()?;
         self.next_token();
         let expression_right = self.parse_expression(Priority::Prefix)?;
         Some(Expressions::PrefixExpression(Box::new(
-            PrefixExpression::new(tok, literal, expression_right),
+            PrefixExpression::new(tok, expression_right),
         )))
     }
 
     fn parse_infix_expression(&mut self, expression_left: Expressions) -> Option<Expressions> {
-        let tok = self.curr_token.as_ref()?.clone();
+        self.next_token();
+        let tok = self.curr_token.as_ref()?;
         let operator = String::from(tok.literal());
         let precedence = self.curr_precedence();
         self.next_token();
         let expression_right = self.parse_expression(precedence)?;
         Some(Expressions::InfixExpression(Box::new(
-            InfixExpression::new(tok, operator, expression_left, expression_right),
+            InfixExpression::new(operator, expression_left, expression_right),
         )))
     }
 
     fn parse_function_literal(&mut self) -> Option<Expressions> {
-        let tok = self.curr_token.as_ref()?.clone();
+        let tok = self.curr_token.take()?;
         if !self.expect_peek(Token::Lparen) {
             return None;
         }
@@ -422,17 +396,15 @@ impl Parser {
             return Some(v);
         }
         self.next_token();
-        let tok = self.curr_token.as_ref()?;
-        let literal = tok.literal();
-        let ident = Identifier::new(tok.clone(), literal.to_string());
+        let tok = self.curr_token.take().unwrap();
+        let ident = Identifier::new(tok);
         v.push(ident);
 
         while self.peek_token == Some(Token::Comma) {
             self.next_token();
             self.next_token();
-            let tok = self.curr_token.as_ref()?;
-            let literal = tok.literal();
-            let ident = Identifier::new(tok.clone(), literal.to_string());
+            let tok = self.curr_token.take().unwrap();
+            let ident = Identifier::new(tok);
             v.push(ident);
         }
 
@@ -443,7 +415,8 @@ impl Parser {
     }
 
     fn parse_call_expression(&mut self, function: Expressions) -> Option<Expressions> {
-        let tok = self.curr_token.clone()?;
+        self.next_token();
+        let tok = self.curr_token.take()?;
         let args = self.parse_call_arguments()?;
         Some(Expressions::CallExpression(Box::new(CallExpression::new(
             tok, function, args,
@@ -477,10 +450,9 @@ impl Parser {
     fn parse_string_literal(&mut self) -> Option<Expressions> {
         let tok = self
             .curr_token
-            .clone()
+            .take()
             .expect("expected current token to exist");
-        let literal = tok.clone().literal().to_string();
-        Some(Expressions::StringLiteral(StringLiteral::new(tok, literal)))
+        Some(Expressions::StringLiteral(StringLiteral::new(tok)))
     }
 }
 
@@ -521,7 +493,7 @@ mod tests {
     }
 
     fn test_integer(expression: &IntegerLiteral, integer: isize) {
-        assert_eq!(&integer, expression.value());
+        assert_eq!(integer, expression.value());
         assert_eq!(format!("{}", integer), expression.token_literal());
     }
 
@@ -625,26 +597,15 @@ mod tests {
     #[test]
     fn test_new_helper() {
         let exp = &InfixExpression::new(
-            Token::Integer(String::from("5")),
             String::from("+"),
-            Expressions::IntegerLiteral(IntegerLiteral::new(Token::Integer(String::from("5")), 5)),
-            Expressions::IntegerLiteral(IntegerLiteral::new(
-                Token::Integer(String::from("10")),
-                10,
-            )),
+            Expressions::IntegerLiteral(IntegerLiteral::new(Token::Integer(String::from("5")))),
+            Expressions::IntegerLiteral(IntegerLiteral::new(Token::Integer(String::from("10")))),
         );
         test_infix_expression(exp, Types::Isize(5), "+", Types::Isize(10));
         let binding = &InfixExpression::new(
-            Token::Ident(String::from("foo")),
             String::from("*"),
-            Expressions::Identifier(Identifier::new(
-                Token::Ident(String::from("foo")),
-                "foo".into(),
-            )),
-            Expressions::Identifier(Identifier::new(
-                Token::Ident(String::from("bar")),
-                "bar".into(),
-            )),
+            Expressions::Identifier(Identifier::new(Token::Ident(String::from("foo")))),
+            Expressions::Identifier(Identifier::new(Token::Ident(String::from("bar")))),
         );
         let exp = Box::new(binding);
         test_infix_expression(&exp, Types::String("foo"), "*", Types::String("bar"));

@@ -8,7 +8,8 @@ pub struct StringLiteral {
 }
 
 impl StringLiteral {
-    pub fn new(token: Token, value: String) -> Self {
+    pub fn new(token: Token) -> Self {
+        let value = String::from(token.literal());
         Self { token, value }
     }
 

@@ -4,20 +4,26 @@ use std::fmt::Display;
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct IntegerLiteral {
     token: Token,
-    value: isize,
+    value: isize
 }
 
 impl IntegerLiteral {
-    pub fn new(token: Token, value: isize) -> Self {
-        Self { token, value }
+    pub fn new(token: Token) -> Self {
+        match token {
+            Token::Integer(_) => {
+                let value = token.literal().parse::<isize>().expect("value was not an isize");
+                Self { token, value}
+            },
+            _ => panic!("Tried to make an integer literal with {}", token),
+        }
     }
 
     pub fn token(&self) -> &Token {
         &self.token
     }
 
-    pub fn value(&self) -> &isize {
-        &self.value
+    pub fn value(&self) -> isize {
+        self.value
     }
 }
 

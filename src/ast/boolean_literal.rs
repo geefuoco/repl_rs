@@ -8,8 +8,14 @@ pub struct BooleanLiteral {
 }
 
 impl BooleanLiteral {
-    pub fn new(token: Token, value: bool) -> Self {
-        Self { token, value }
+    pub fn new(token: Token) -> Self {
+        match token {
+            Token::True | Token::False => {
+                let value = token.literal().parse::<bool>().unwrap();
+                Self { token, value }
+            }
+            _ => panic!("cannot make boolean from {} token", token),
+        }
     }
 
     pub fn token(&self) -> &Token {

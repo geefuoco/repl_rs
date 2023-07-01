@@ -11,7 +11,8 @@ pub struct PrefixExpression {
 }
 
 impl PrefixExpression {
-    pub fn new(token: Token, operator: String, expression_right: Expressions) -> Self {
+    pub fn new(token: Token, expression_right: Expressions) -> Self {
+        let operator = String::from(token.literal());
         Self {
             token,
             operator,

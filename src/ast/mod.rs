@@ -235,8 +235,8 @@ mod tests {
     #[test]
     fn test_string() {
         let mut v: Vec<Statements> = Vec::new();
-        let name = Identifier::new(Token::Ident("my_var".into()), "my_var".into());
-        let value = Identifier::new(Token::Ident("another_var".into()), "another_var".into());
+        let name = Identifier::new(Token::Ident("my_var".into()));
+        let value = Identifier::new(Token::Ident("another_var".into()));
         let let_statement = LetStatement::new(Token::Let, name, Expressions::Identifier(value));
         v.push(Statements::LetStatement(let_statement));
 

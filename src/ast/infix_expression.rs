@@ -5,7 +5,6 @@ use super::Expressions;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct InfixExpression {
-    token: Token,
     operator: String,
     expression_left: Expressions,
     expression_right: Expressions,
@@ -13,20 +12,29 @@ pub struct InfixExpression {
 
 impl InfixExpression {
     pub fn new(
-        token: Token,
         operator: String,
         expression_left: Expressions,
         expression_right: Expressions,
     ) -> Self {
         Self {
-            token,
             operator,
             expression_left,
             expression_right,
         }
     }
     pub fn token(&self) -> &Token {
-        &self.token
+        match &self.expression_left {
+            Expressions::Identifier(x) => x.token(),
+            Expressions::BooleanLiteral(x) => x.token(),
+            Expressions::IntegerLiteral(x) => x.token(),
+            Expressions::IfExpression(x) => x.token(),
+            Expressions::InfixExpression(x) => x.token(),
+            Expressions::PrefixExpression(x) => x.token(),
+            Expressions::CallExpression(x) => x.token(),
+            Expressions::FunctionLiteral(x) => x.token(),
+            Expressions::StringLiteral(x) => x.token(),
+            Expressions::Empty => panic!("Tried to get token from empty expression"),
+        }
     }
 
     pub fn operator(&self) -> &str {
@@ -50,7 +58,18 @@ impl Expression for InfixExpression {
 
 impl Node for InfixExpression {
     fn token_literal(&self) -> &str {
-        self.token.literal()
+        match &self.expression_left {
+            Expressions::Identifier(x) => x.token_literal(),
+            Expressions::BooleanLiteral(x) => x.token_literal(),
+            Expressions::IntegerLiteral(x) => x.token_literal(),
+            Expressions::IfExpression(x) => x.token_literal(),
+            Expressions::InfixExpression(x) => x.token_literal(),
+            Expressions::PrefixExpression(x) => x.token_literal(),
+            Expressions::CallExpression(x) => x.token_literal(),
+            Expressions::FunctionLiteral(x) => x.token_literal(),
+            Expressions::StringLiteral(x) => x.token_literal(),
+            Expressions::Empty => panic!("Tried to print token of empty expression"),
+        }
     }
 }
 
