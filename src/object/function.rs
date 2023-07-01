@@ -1,5 +1,5 @@
-use std::fmt::Display;
 use crate::ast::{BlockStatement, Identifier};
+use std::fmt::Display;
 
 use super::{Environment, Object, ObjectTypes};
 
@@ -12,10 +12,10 @@ pub struct Function {
 
 impl Function {
     pub fn new(parameters: Vec<Identifier>, body: BlockStatement, env: Environment) -> Self {
-        Function{
+        Function {
             parameters,
             body,
-            env
+            env,
         }
     }
 
@@ -44,7 +44,7 @@ impl Object for Function {
         let len = params.len();
         for (i, p) in params.iter().enumerate() {
             s.push_str(p.as_str());
-            if i < len-1 {
+            if i < len - 1 {
                 s.push_str(",")
             }
         }
@@ -55,7 +55,7 @@ impl Object for Function {
     }
 }
 
-impl Display for Function{
+impl Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.obj_type())
     }

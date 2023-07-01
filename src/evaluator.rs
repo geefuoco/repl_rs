@@ -96,7 +96,7 @@ fn eval_statements(statements: &[Statements], env: &mut Environment) -> Option<O
                     println!("Error in let statement");
                     return Some(let_value);
                 }
-                env.set(value.name().value().into(), let_value.clone());
+                env.set(value.name().value().into(), let_value);
             }
             Statements::ReturnStatement(value) => {
                 let return_value = eval_expression(value.return_value(), env);
@@ -156,7 +156,7 @@ fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
         Expressions::FunctionLiteral(value) => {
             let params: Vec<Identifier> = value.parameters().to_vec();
             let body = value.body();
-            return Objects::Function(Function::new(params.clone(), body.clone(), env.clone()));
+            return Objects::Function(Function::new(params, body.clone(), env.clone()));
         }
         Expressions::CallExpression(value) => {
             let func = eval_expression(value.function(), env);
@@ -167,7 +167,7 @@ fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
             if arguments.len() == 1 && arguments[0].is_err() {
                 return arguments.remove(0);
             }
-            return apply_function(func, arguments);
+            return apply_function(func, &mut arguments);
         }
         Expressions::StringLiteral(value) => {
             Objects::String(StringObject::new(value.value().into()))
@@ -176,7 +176,7 @@ fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
     }
 }
 
-fn apply_function(func: Objects, arguments: Vec<Objects>) -> Objects {
+fn apply_function(func: Objects, arguments: &mut Vec<Objects>) -> Objects {
     if let Some(func) = func.clone().as_fn() {
         let extended_env = extend_function_env(&func, arguments);
         if extended_env.is_none() {
@@ -194,11 +194,11 @@ fn apply_function(func: Objects, arguments: Vec<Objects>) -> Objects {
     }
 }
 
-fn extend_function_env(func: &Function, args: Vec<Objects>) -> Option<Environment> {
+fn extend_function_env(func: &Function, args: &mut Vec<Objects>) -> Option<Environment> {
     let mut extended_env = Environment::new_enclosed_environment(func.environment().clone());
-    for (i, p) in func.parameters().iter().enumerate() {
-        let next = args.get(i)?;
-        extended_env.set(p.value().into(), next.clone());
+    for (_, p) in func.parameters().iter().enumerate() {
+        let next = args.remove(0);
+        extended_env.set(p.value().into(), next);
     }
     Some(extended_env)
 }
