@@ -30,6 +30,10 @@ impl PrefixExpression {
     pub fn expression_right(&self) -> &Expressions {
         &self.expression_right
     }
+
+    pub fn expression_right_mut(&mut self) -> &mut Expressions {
+        &mut self.expression_right
+    }
 }
 
 impl Expression for PrefixExpression {

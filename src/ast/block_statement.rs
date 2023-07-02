@@ -20,6 +20,17 @@ impl BlockStatement {
     pub fn statements(&self) -> &[Statements] {
         &self.statements
     }
+
+    pub fn statements_mut(&mut self) -> &mut [Statements] {
+        &mut self.statements
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            token: Token::Illegal,
+            statements: vec![],
+        }
+    }
 }
 
 impl Statement for BlockStatement {

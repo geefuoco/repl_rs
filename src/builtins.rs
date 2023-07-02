@@ -4,19 +4,21 @@ use crate::object::Integer;
 use crate::object::Null;
 use crate::object::Object;
 use crate::object::Objects;
-use crate::object::Return;
+
+const BUILTIN_FUNCTIONS_COUNT: usize = 2;
 
 pub struct BuiltinFunctions {
-    function_list: [BuiltinWrapper; 1],
+    function_list: [BuiltinWrapper; BUILTIN_FUNCTIONS_COUNT],
 }
 
 pub enum BuiltinFunctionNames {
     Len = 0,
+    Drop = 1,
 }
 
 impl BuiltinFunctions {
     pub const fn new() -> Self {
-        let v = [BuiltinWrapper::new(BuiltinFunctions::len)];
+        let v = [BuiltinWrapper::new(BuiltinFunctions::len), BuiltinWrapper::new(BuiltinFunctions::drop)];
         Self { function_list: v }
     }
 
@@ -46,5 +48,16 @@ impl BuiltinFunctions {
                 )));
             }
         }
+    }
+
+    fn drop(args: &[Objects]) -> Objects {
+        if args.len() != 1 {
+            return Objects::Error(ErrorObject::new(format!(
+                "expected 1 argument but received {}",
+                args.len()
+            )));
+        }
+        //drop logic
+        return Objects::Null(Null{ });
     }
 }

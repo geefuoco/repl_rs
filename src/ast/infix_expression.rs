@@ -48,6 +48,14 @@ impl InfixExpression {
     pub fn expression_left(&self) -> &Expressions {
         &self.expression_left
     }
+
+    pub fn expression_right_mut(&mut self) -> &mut Expressions {
+        &mut self.expression_right
+    }
+
+    pub fn expression_left_mut(&mut self) -> &mut Expressions {
+        &mut self.expression_left
+    }
 }
 
 impl Expression for InfixExpression {

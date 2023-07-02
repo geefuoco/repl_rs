@@ -37,6 +37,10 @@ fn eval_identifier(ident: &Identifier, env: &mut Environment) -> Objects {
             let wrapper = BUILTIN.get(BuiltinFunctionNames::Len);
             return Objects::Builtin(wrapper.clone());
         }
+        "drop" => {
+            let wrapper = BUILTIN.get(BuiltinFunctionNames::Drop);
+            return Objects::Builtin(wrapper.clone());
+        }
         _ => {}
     }
     if let Some(obj) = env.get(ident.value().into()) {
@@ -49,9 +53,9 @@ fn eval_identifier(ident: &Identifier, env: &mut Environment) -> Objects {
     }
 }
 
-fn eval_block_statement(block: &BlockStatement, env: &mut Environment) -> Option<Objects> {
+fn eval_block_statement(block: &mut BlockStatement, env: &mut Environment) -> Option<Objects> {
     let mut final_result: Option<Objects> = None;
-    for stmt in block.statements() {
+    for stmt in block.statements_mut().iter_mut() {
         let result = eval_statement(stmt, env)?;
 
         if result.obj_type() == ObjectTypes::Error {
@@ -67,25 +71,25 @@ fn eval_block_statement(block: &BlockStatement, env: &mut Environment) -> Option
     final_result
 }
 
-fn eval_statement(statement: &Statements, env: &mut Environment) -> Option<Objects> {
+fn eval_statement(statement: &mut Statements, env: &mut Environment) -> Option<Objects> {
     let mut result: Option<Objects> = None;
     match statement {
         Statements::LetStatement(value) => {
-            let let_value = eval_expression(value.value(), env);
+            let let_value = eval_expression(&mut value.value_mut(), env);
             if let_value.is_err() {
                 return Some(let_value);
             }
             env.set(value.name().value().into(), let_value);
         }
         Statements::ReturnStatement(value) => {
-            let return_value = eval_expression(value.return_value(), env);
+            let return_value = eval_expression(&mut value.return_value_mut(), env);
             if return_value.is_err() {
                 return Some(return_value);
             }
             result = Some(Objects::Return(Return::new(return_value)));
         }
         Statements::ExpressionStatement(value) => {
-            result = Some(eval_expression(value.expression(), env));
+            result = Some(eval_expression(&mut value.expression_mut(), env));
         }
         Statements::BlockStatement(value) => {
             let block_statement = eval_block_statement(value, env)?;
@@ -96,13 +100,13 @@ fn eval_statement(statement: &Statements, env: &mut Environment) -> Option<Objec
     result
 }
 
-fn eval_statements(statements: &[Statements], env: &mut Environment) -> Option<Objects> {
+fn eval_statements(statements: &mut [Statements], env: &mut Environment) -> Option<Objects> {
     let mut result: Option<Objects> = None;
     let mut is_err = false;
-    for stmt in statements {
+    for stmt in statements.iter_mut() {
         match stmt {
             Statements::LetStatement(value) => {
-                let let_value = eval_expression(value.value(), env);
+                let let_value = eval_expression(&mut value.value_mut(), env);
                 if let_value.is_err() {
                     println!("Error in let statement");
                     return Some(let_value);
@@ -110,12 +114,12 @@ fn eval_statements(statements: &[Statements], env: &mut Environment) -> Option<O
                 env.set(value.name().value().into(), let_value);
             }
             Statements::ReturnStatement(value) => {
-                let return_value = eval_expression(value.return_value(), env);
+                let return_value = eval_expression(&mut value.return_value_mut(), env);
                 let ret = Objects::Return(Return::new(return_value));
                 return Some(ret);
             }
             Statements::ExpressionStatement(value) => {
-                result = Some(eval_expression(value.expression(), env));
+                result = Some(eval_expression(&mut value.expression_mut(), env));
             }
             Statements::BlockStatement(value) => {
                 result = eval_block_statement(value, env);
@@ -132,7 +136,7 @@ fn eval_statements(statements: &[Statements], env: &mut Environment) -> Option<O
     result
 }
 
-fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
+fn eval_expression(node: &mut Expressions, env: &mut Environment) -> Objects {
     match node {
         Expressions::Identifier(value) => eval_identifier(value, env),
         Expressions::BooleanLiteral(value) => {
@@ -147,18 +151,18 @@ fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
             eval_if_expression(value, env).expect("could not evaluate if expression")
         }
         Expressions::InfixExpression(value) => {
-            let left = eval_expression(value.expression_left(), env);
+            let left = eval_expression(&mut value.expression_left_mut(), env);
             if left.is_err() {
                 return left;
             }
-            let right = eval_expression(value.expression_right(), env);
+            let right = eval_expression(&mut value.expression_right_mut(), env);
             if right.is_err() {
                 return right;
             }
             return eval_infix_expression(value.operator(), left, right);
         }
         Expressions::PrefixExpression(value) => {
-            let right = eval_expression(value.expression_right(), env);
+            let right = eval_expression(&mut value.expression_right_mut(), env);
             if right.is_err() {
                 return right;
             }
@@ -166,19 +170,19 @@ fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
         }
         Expressions::FunctionLiteral(value) => {
             let params: Vec<Identifier> = value.parameters().to_vec();
-            let body = value.body();
-            return Objects::Function(Function::new(params, body.clone(), env.clone()));
+            let body = std::mem::replace(value.body_mut(), BlockStatement::empty());
+            return Objects::Function(Function::new(params, body, env.clone()));
         }
         Expressions::CallExpression(value) => {
-            let func = eval_expression(value.function(), env);
+            let mut func = eval_expression(&mut value.function_mut(), env);
             if func.is_err() {
                 return func;
             }
-            let mut arguments = eval_expressions(value.arguments(), env);
+            let mut arguments = eval_expressions(&mut value.arguments_mut(), env);
             if arguments.len() == 1 && arguments[0].is_err() {
                 return arguments.remove(0);
             }
-            return apply_function(func, &mut arguments);
+            return apply_function(&mut func, &mut arguments);
         }
         Expressions::StringLiteral(value) => {
             Objects::String(StringObject::new(value.value().into()))
@@ -187,7 +191,7 @@ fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
     }
 }
 
-fn apply_function(func: Objects, arguments: &mut Vec<Objects>) -> Objects {
+fn apply_function(func: &mut Objects, arguments: &mut Vec<Objects>) -> Objects {
     match func {
         Objects::Builtin(b) => {
             let func = b.func();
@@ -202,7 +206,7 @@ fn apply_function(func: Objects, arguments: &mut Vec<Objects>) -> Objects {
                 ));
             }
             let mut extended_env = extended_env.unwrap();
-            let evaluated = eval_block_statement(func.body(), &mut extended_env);
+            let evaluated = eval_block_statement(&mut func.body_mut(), &mut extended_env);
             return evaluated.expect("Expected an Objects value but evaluated to None");
         }
         _ => {
@@ -222,9 +226,9 @@ fn extend_function_env(func: &Function, args: &mut Vec<Objects>) -> Option<Envir
     Some(extended_env)
 }
 
-fn eval_expressions(expressions: &[Expressions], env: &mut Environment) -> Vec<Objects> {
+fn eval_expressions(expressions: &mut [Expressions], env: &mut Environment) -> Vec<Objects> {
     let mut v = Vec::new();
-    for ex in expressions {
+    for ex in expressions.iter_mut() {
         let evaluated = eval_expression(ex, env);
         if evaluated.is_err() {
             return [evaluated].to_vec();
@@ -334,15 +338,15 @@ fn eval_integer_infix_expression(operator: &str, left: &Integer, right: &Integer
     }
 }
 
-fn eval_if_expression(exp: &IfExpression, env: &mut Environment) -> Option<Objects> {
-    let condition = eval_expression(exp.condition(), env);
+fn eval_if_expression(exp: &mut IfExpression, env: &mut Environment) -> Option<Objects> {
+    let condition = eval_expression(&mut exp.condition_mut(), env);
     if condition.is_err() {
         return Some(condition);
     }
     if is_truthy(&condition) {
-        return eval_block_statement(exp.consequence(), env);
+        return eval_block_statement(&mut exp.consequence_mut(), env);
     } else if exp.alternative().is_some() {
-        return eval_block_statement(exp.alternative().as_ref().unwrap(), env);
+        return eval_block_statement(&mut exp.alternative_mut().unwrap(), env);
     } else {
         return Some(Objects::Null(NULL));
     }
@@ -361,8 +365,8 @@ fn is_truthy(obj: &Objects) -> bool {
     }
 }
 
-pub fn eval_program(node: &Program, env: &mut Environment) -> Option<Objects> {
-    eval_statements(&node.statements, env)
+pub fn eval_program(node: &mut Program, env: &mut Environment) -> Option<Objects> {
+    eval_statements(&mut node.statements, env)
 }
 
 #[cfg(test)]
@@ -378,9 +382,9 @@ mod test {
     fn test_eval(input: &str) -> Option<Objects> {
         let l = Lexer::new(input.into());
         let mut p = Parser::new(l);
-        let program = p.parse_program().expect("Program did not parse properly");
+        let mut program = p.parse_program().expect("Program did not parse properly");
         let mut env = Environment::new();
-        eval_program(&program, &mut env)
+        eval_program(&mut program, &mut env)
     }
 
     fn test_int(obj: &Objects, exp: &isize) {

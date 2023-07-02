@@ -24,6 +24,10 @@ impl ReturnStatement {
     pub fn return_value(&self) -> &Expressions {
         &self.return_value
     }
+
+    pub fn return_value_mut(&mut self) -> &mut Expressions {
+        &mut self.return_value
+    }
 }
 
 impl Display for ReturnStatement {

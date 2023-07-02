@@ -34,12 +34,23 @@ impl IfExpression {
         &self.consequence
     }
 
+    pub fn consequence_mut(&mut self) -> &mut BlockStatement {
+        &mut self.consequence
+    }
+
     pub fn condition(&self) -> &Box<Expressions> {
         &self.condition
     }
+    pub fn condition_mut(&mut self) -> &mut Expressions {
+        self.condition.as_mut()
+    }
 
-    pub fn alternative(&self) -> &Option<BlockStatement> {
-        &self.alternative.0
+    pub fn alternative(&self) -> Option<&BlockStatement> {
+        self.alternative.0.as_ref()
+    }
+
+    pub fn alternative_mut(&mut self) -> Option<&mut BlockStatement> {
+        self.alternative.0.as_mut()
     }
 }
 

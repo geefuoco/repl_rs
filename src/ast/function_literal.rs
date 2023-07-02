@@ -24,6 +24,9 @@ impl FunctionLiteral {
     pub fn body(&self) -> &BlockStatement {
         &self.body
     }
+    pub fn body_mut(&mut self) -> &mut BlockStatement {
+        &mut self.body
+    }
 
     pub fn parameters(&self) -> &[Identifier] {
         self.parameters.as_ref()

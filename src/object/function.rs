@@ -27,6 +27,10 @@ impl Function {
         &self.body
     }
 
+    pub fn body_mut(&mut self) -> &mut BlockStatement {
+        &mut self.body
+    }
+
     pub fn environment(&self) -> &Environment {
         &self.env
     }

@@ -13,11 +13,11 @@ pub fn start() -> Result<(), Box<dyn std::error::Error>> {
                 let lex = Lexer::new(line);
                 let mut parser = Parser::new(lex);
 
-                let program = parser.parse_program();
+                let mut program = parser.parse_program();
 
-                match program {
+                match &mut program {
                     Ok(program) => {
-                        let evaluated = evaluator::eval_program(&program, &mut env);
+                        let evaluated = evaluator::eval_program(program, &mut env);
                         if let Some(evaluated) = evaluated {
                             println!("{}", evaluated.inspect());
                         }

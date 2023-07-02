@@ -25,6 +25,10 @@ impl LetStatement {
     pub fn value(&self) -> &Expressions {
         &self.value
     }
+
+    pub fn value_mut(&mut self) -> &mut Expressions {
+        &mut self.value
+    }
 }
 
 impl Display for LetStatement {

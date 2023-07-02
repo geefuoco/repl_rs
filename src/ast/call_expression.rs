@@ -25,8 +25,16 @@ impl CallExpression {
         &self.function
     }
 
+    pub fn function_mut(&mut self) -> &mut Expressions {
+        &mut self.function
+    }
+
     pub fn arguments(&self) -> &[Expressions] {
         &self.arguments
+    }
+
+    pub fn arguments_mut(&mut self) -> &mut [Expressions] {
+        &mut self.arguments
     }
 }
 

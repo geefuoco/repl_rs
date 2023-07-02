@@ -28,6 +28,10 @@ impl ExpressionStatement {
     pub fn expression(&self) -> &Expressions {
         &self.expression
     }
+
+    pub fn expression_mut(&mut self) -> &mut Expressions {
+        &mut self.expression
+    }
 }
 
 impl Statement for ExpressionStatement {
