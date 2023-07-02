@@ -4,14 +4,16 @@ use std::{
 };
 
 mod boolean;
+mod builtin_function;
 mod environment;
 mod error;
+mod function;
 mod integer;
 mod null;
 mod return_object;
-mod function;
 mod string_object;
 pub use boolean::Boolean;
+pub use builtin_function::BuiltinWrapper;
 pub use environment::Environment;
 pub use error::Error as ErrorObject;
 pub use function::Function;
@@ -28,7 +30,8 @@ pub enum Objects {
     Return(Return),
     Error(ErrorObject),
     Function(Function),
-    String(StringObject)
+    String(StringObject),
+    Builtin(BuiltinWrapper),
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -39,7 +42,8 @@ pub enum ObjectTypes {
     Return,
     Error,
     Function,
-    String
+    String,
+    Builtin,
 }
 
 impl Display for ObjectTypes {
@@ -51,7 +55,8 @@ impl Display for ObjectTypes {
             ObjectTypes::Return => write!(f, "RETURN"),
             ObjectTypes::Error => write!(f, "ERROR"),
             ObjectTypes::Function => write!(f, "FUNCTION"),
-            ObjectTypes::String => write!(f, "STRING")
+            ObjectTypes::String => write!(f, "STRING"),
+            ObjectTypes::Builtin => write!(f, "BUILTIN"),
         }
     }
 }
@@ -65,7 +70,8 @@ impl Display for Objects {
             Objects::Return(x) => write!(f, "{}", x.obj_type()),
             Objects::Error(x) => write!(f, "{}", x.obj_type()),
             Objects::Function(x) => write!(f, "{}", x.obj_type()),
-            Objects::String(x) => write!(f, "{}", x.obj_type())
+            Objects::String(x) => write!(f, "{}", x.obj_type()),
+            Objects::Builtin(x) => write!(f, "{}", x.obj_type()),
         }
     }
 }
@@ -98,7 +104,7 @@ impl Objects {
     pub fn as_fn(self) -> Option<Function> {
         match self {
             Objects::Function(x) => Some(x),
-            _ => None
+            _ => None,
         }
     }
     pub fn as_err(self) -> Option<ErrorObject> {
@@ -110,7 +116,19 @@ impl Objects {
     pub fn as_str(self) -> Option<StringObject> {
         match self {
             Objects::String(x) => Some(x),
-            _ => None
+            _ => None,
+        }
+    }
+    pub fn as_builtin(self) -> Option<BuiltinWrapper> {
+        match self {
+            Objects::Builtin(x) => Some(x),
+            _ => None,
+        }
+    }
+    pub fn is_return(&self) -> bool {
+        match self {
+            Objects::Return(_) => true,
+            _ => false,
         }
     }
 }
@@ -125,6 +143,7 @@ impl Object for Objects {
             Objects::Error(x) => x.obj_type(),
             Objects::Function(x) => x.obj_type(),
             Objects::String(x) => x.obj_type(),
+            Objects::Builtin(x) => x.obj_type(),
         }
     }
 
@@ -136,13 +155,14 @@ impl Object for Objects {
             Objects::Return(x) => x.inspect(),
             Objects::Error(x) => x.inspect(),
             Objects::Function(x) => x.inspect(),
-            Objects::String(x) => x.inspect()
+            Objects::String(x) => x.inspect(),
+            Objects::Builtin(x) => x.inspect(),
         }
     }
 
     fn is_err(&self) -> bool {
         match self {
-            Objects::Error(x) => true,
+            Objects::Error(_) => true,
             _ => false,
         }
     }
@@ -178,6 +198,12 @@ pub trait Object: Debug {
     fn is_err(&self) -> bool {
         match self.obj_type() {
             ObjectTypes::Error => true,
+            _ => false,
+        }
+    }
+    fn is_builtin(&self) -> bool {
+        match self.obj_type() {
+            ObjectTypes::Builtin => true,
             _ => false,
         }
     }

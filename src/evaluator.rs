@@ -1,9 +1,12 @@
+
 use crate::ast::BlockStatement;
 use crate::ast::Expressions;
 use crate::ast::Identifier;
 use crate::ast::IfExpression;
 use crate::ast::Program;
 use crate::ast::Statements;
+use crate::builtins::BuiltinFunctionNames;
+use crate::builtins::BuiltinFunctions;
 use crate::object::Boolean;
 use crate::object::Environment;
 use crate::object::ErrorObject;
@@ -19,6 +22,7 @@ use crate::object::StringObject;
 const TRUE: Boolean = Boolean { value: true };
 const FALSE: Boolean = Boolean { value: false };
 const NULL: Null = Null {};
+const BUILTIN: BuiltinFunctions = BuiltinFunctions::new();
 
 fn bool_helper(b: bool) -> Boolean {
     if b {
@@ -28,6 +32,13 @@ fn bool_helper(b: bool) -> Boolean {
 }
 
 fn eval_identifier(ident: &Identifier, env: &mut Environment) -> Objects {
+    match ident.value() {
+        "len" => {
+            let wrapper = BUILTIN.get(BuiltinFunctionNames::Len);
+            return Objects::Builtin(wrapper.clone());
+        }
+        _ => {}
+    }
     if let Some(obj) = env.get(ident.value().into()) {
         return obj;
     } else {
@@ -177,20 +188,28 @@ fn eval_expression(node: &Expressions, env: &mut Environment) -> Objects {
 }
 
 fn apply_function(func: Objects, arguments: &mut Vec<Objects>) -> Objects {
-    if let Some(func) = func.clone().as_fn() {
-        let extended_env = extend_function_env(&func, arguments);
-        if extended_env.is_none() {
-            return Objects::Error(ErrorObject::new(
-                "Invalid number of arguments to function".into(),
-            ));
+    match func {
+        Objects::Builtin(b) => {
+            let func = b.func();
+            let evaluated = func(&arguments);
+            return evaluated;
         }
-        let mut extended_env = extended_env.unwrap();
-        let evaluated = eval_block_statement(func.body(), &mut extended_env);
-        return evaluated.expect("Expected an Objects value but evaluated to None");
-    } else {
-        Objects::Error(ErrorObject::new(
-            format!("not a function: {}", func.obj_type()).into(),
-        ))
+        Objects::Function(func) => {
+            let extended_env = extend_function_env(&func, arguments);
+            if extended_env.is_none() {
+                return Objects::Error(ErrorObject::new(
+                    "Invalid number of arguments to function".into(),
+                ));
+            }
+            let mut extended_env = extended_env.unwrap();
+            let evaluated = eval_block_statement(func.body(), &mut extended_env);
+            return evaluated.expect("Expected an Objects value but evaluated to None");
+        }
+        _ => {
+            Objects::Error(ErrorObject::new(
+                format!("not a function: {}", func.obj_type()).into(),
+            ))
+        }
     }
 }
 
@@ -351,6 +370,11 @@ mod test {
     use super::*;
     use crate::{lexer::Lexer, parser::Parser};
 
+    enum Types {
+        Integer(isize),
+        String(String),
+    }
+
     fn test_eval(input: &str) -> Option<Objects> {
         let l = Lexer::new(input.into());
         let mut p = Parser::new(l);
@@ -360,6 +384,10 @@ mod test {
     }
 
     fn test_int(obj: &Objects, exp: &isize) {
+        if obj.is_err() {
+            println!("{}", obj.clone().as_err().unwrap().message());
+            return;
+        }
         let obj = obj
             .clone()
             .as_integer()
@@ -690,6 +718,41 @@ mod test {
                 assert_eq!("hello world", ev.value());
             }
             None => assert!(false, "No output"),
+        }
+    }
+
+    #[test]
+    fn test_builtin_functions() {
+        let inputs = [
+            (r#"len("")"#, Types::Integer(0)),
+            (r#"len("hello")"#, Types::Integer(5)),
+            (r#"len("    ")"#, Types::Integer(4)),
+            (
+                r#"len(1)"#,
+                Types::String("argument to 'len' not supported, got INTEGER".into()),
+            ),
+            (
+                r#"len("one", "two")"#,
+                Types::String("expected 1 argument but received 2".into()),
+            ),
+        ];
+
+        for (input, exp) in inputs {
+            match test_eval(input) {
+                Some(ev) => match exp {
+                    Types::Integer(x) => {
+                        test_int(&ev, &x)
+                    }
+                    Types::String(x) => {
+                        if !ev.is_err() {
+                            panic!("Expected error object but received: {:?}", ev);
+                        }
+                        let err = ev.as_err().unwrap();
+                        assert_eq!(x, err.message());
+                    }
+                },
+                None => assert!(false, "No output"),
+            }
         }
     }
 }
