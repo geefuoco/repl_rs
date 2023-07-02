@@ -10,6 +10,10 @@ pub fn start() -> Result<(), Box<dyn std::error::Error>> {
         io::Write::flush(&mut io::stdout())?;
         for line in io::stdin().lines() {
             if let Ok(line) = line {
+                match line.as_str() {
+                    "quit" | "exit" => std::process::exit(0),
+                    _ => {}
+                }
                 let lex = Lexer::new(line);
                 let mut parser = Parser::new(lex);
 
