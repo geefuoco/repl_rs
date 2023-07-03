@@ -1,5 +1,7 @@
 use crate::ast::{BlockStatement, Identifier};
+use std::cell::RefCell;
 use std::fmt::Display;
+use std::rc::Rc;
 
 use super::{Environment, Object, ObjectTypes};
 
@@ -7,11 +9,15 @@ use super::{Environment, Object, ObjectTypes};
 pub struct Function {
     parameters: Vec<Identifier>,
     body: BlockStatement,
-    env: Environment,
+    env: Rc<RefCell<Environment>>,
 }
 
 impl Function {
-    pub fn new(parameters: Vec<Identifier>, body: BlockStatement, env: Environment) -> Self {
+    pub fn new(
+        parameters: Vec<Identifier>,
+        body: BlockStatement,
+        env: Rc<RefCell<Environment>>,
+    ) -> Self {
         Function {
             parameters,
             body,
@@ -31,7 +37,7 @@ impl Function {
         &mut self.body
     }
 
-    pub fn environment(&self) -> &Environment {
+    pub fn environment(&self) -> &Rc<RefCell<Environment>> {
         &self.env
     }
 }

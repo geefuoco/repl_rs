@@ -1,10 +1,12 @@
 use crate::object::Object;
 use crate::{evaluator, lexer::Lexer, object::Environment, parser::Parser};
+use std::cell::RefCell;
 use std::io;
+use std::rc::Rc;
 
 pub fn start() -> Result<(), Box<dyn std::error::Error>> {
     let prompt = ">> ";
-    let mut env = Environment::new();
+    let env = Rc::new(RefCell::new(Environment::new()));
     loop {
         print!("{}", prompt);
         io::Write::flush(&mut io::stdout())?;
@@ -21,7 +23,7 @@ pub fn start() -> Result<(), Box<dyn std::error::Error>> {
 
                 match &mut program {
                     Ok(program) => {
-                        let evaluated = evaluator::eval_program(program, &mut env);
+                        let evaluated = evaluator::eval_program(program, Rc::clone(&env));
                         if let Some(evaluated) = evaluated {
                             println!("{}", evaluated.inspect());
                         }

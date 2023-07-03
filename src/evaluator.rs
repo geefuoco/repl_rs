@@ -17,6 +17,8 @@ use crate::object::ObjectTypes;
 use crate::object::Objects;
 use crate::object::Return;
 use crate::object::StringObject;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 const TRUE: Boolean = Boolean { value: true };
 const FALSE: Boolean = Boolean { value: false };
@@ -30,7 +32,7 @@ fn bool_helper(b: bool) -> Boolean {
     FALSE
 }
 
-fn eval_identifier(ident: &Identifier, env: &mut Environment) -> Objects {
+fn eval_identifier(ident: &Identifier, env: Rc<RefCell<Environment>>) -> Objects {
     match ident.value() {
         "len" => {
             let wrapper = BUILTIN.get(BuiltinFunctionNames::Len);
@@ -42,6 +44,7 @@ fn eval_identifier(ident: &Identifier, env: &mut Environment) -> Objects {
         }
         _ => {}
     }
+    let env = env.borrow();
     if let Some(obj) = env.get(ident.value().into()) {
         return obj;
     } else {
@@ -52,10 +55,13 @@ fn eval_identifier(ident: &Identifier, env: &mut Environment) -> Objects {
     }
 }
 
-fn eval_block_statement(block: &mut BlockStatement, env: &mut Environment) -> Option<Objects> {
+fn eval_block_statement(
+    block: &mut BlockStatement,
+    env: Rc<RefCell<Environment>>,
+) -> Option<Objects> {
     let mut final_result: Option<Objects> = None;
     for stmt in block.statements_mut().iter_mut() {
-        let result = eval_statement(stmt, env)?;
+        let result = eval_statement(stmt, Rc::clone(&env))?;
 
         if result.obj_type() == ObjectTypes::Error {
             return Some(result);
@@ -70,15 +76,15 @@ fn eval_block_statement(block: &mut BlockStatement, env: &mut Environment) -> Op
     final_result
 }
 
-fn eval_statement(statement: &mut Statements, env: &mut Environment) -> Option<Objects> {
+fn eval_statement(statement: &mut Statements, env: Rc<RefCell<Environment>>) -> Option<Objects> {
     let mut result: Option<Objects> = None;
     match statement {
         Statements::LetStatement(value) => {
-            let let_value = eval_expression(&mut value.value_mut(), env);
+            let let_value = eval_expression(&mut value.value_mut(), Rc::clone(&env));
             if let_value.is_err() {
                 return Some(let_value);
             }
-            env.set(value.name().value().into(), let_value);
+            env.borrow_mut().set(value.name().value().into(), let_value);
         }
         Statements::ReturnStatement(value) => {
             let return_value = eval_expression(&mut value.return_value_mut(), env);
@@ -99,29 +105,35 @@ fn eval_statement(statement: &mut Statements, env: &mut Environment) -> Option<O
     result
 }
 
-fn eval_statements(statements: &mut [Statements], env: &mut Environment) -> Option<Objects> {
+fn eval_statements(
+    statements: &mut [Statements],
+    env: Rc<RefCell<Environment>>,
+) -> Option<Objects> {
     let mut result: Option<Objects> = None;
     let mut is_err = false;
     for stmt in statements.iter_mut() {
         match stmt {
             Statements::LetStatement(value) => {
-                let let_value = eval_expression(&mut value.value_mut(), env);
+                let let_value = eval_expression(&mut value.value_mut(), Rc::clone(&env));
                 if let_value.is_err() {
                     println!("Error in let statement");
                     return Some(let_value);
                 }
-                env.set(value.name().value().into(), let_value);
+                env.borrow_mut().set(value.name().value().into(), let_value);
             }
             Statements::ReturnStatement(value) => {
-                let return_value = eval_expression(&mut value.return_value_mut(), env);
+                let return_value = eval_expression(&mut value.return_value_mut(), Rc::clone(&env));
                 let ret = Objects::Return(Return::new(return_value));
                 return Some(ret);
             }
             Statements::ExpressionStatement(value) => {
-                result = Some(eval_expression(&mut value.expression_mut(), env));
+                result = Some(eval_expression(
+                    &mut value.expression_mut(),
+                    Rc::clone(&env),
+                ));
             }
             Statements::BlockStatement(value) => {
-                result = eval_block_statement(value, env);
+                result = eval_block_statement(value, Rc::clone(&env));
             }
             Statements::Empty => panic!("Reached an empty statement"),
         }
@@ -135,7 +147,7 @@ fn eval_statements(statements: &mut [Statements], env: &mut Environment) -> Opti
     result
 }
 
-fn eval_expression(node: &mut Expressions, env: &mut Environment) -> Objects {
+fn eval_expression(node: &mut Expressions, env: Rc<RefCell<Environment>>) -> Objects {
     match node {
         Expressions::Identifier(value) => eval_identifier(value, env),
         Expressions::BooleanLiteral(value) => {
@@ -150,18 +162,18 @@ fn eval_expression(node: &mut Expressions, env: &mut Environment) -> Objects {
             eval_if_expression(value, env).expect("could not evaluate if expression")
         }
         Expressions::InfixExpression(value) => {
-            let left = eval_expression(&mut value.expression_left_mut(), env);
+            let left = eval_expression(&mut value.expression_left_mut(), Rc::clone(&env));
             if left.is_err() {
                 return left;
             }
-            let right = eval_expression(&mut value.expression_right_mut(), env);
+            let right = eval_expression(&mut value.expression_right_mut(), Rc::clone(&env));
             if right.is_err() {
                 return right;
             }
             return eval_infix_expression(value.operator(), left, right);
         }
         Expressions::PrefixExpression(value) => {
-            let right = eval_expression(&mut value.expression_right_mut(), env);
+            let right = eval_expression(&mut value.expression_right_mut(), Rc::clone(&env));
             if right.is_err() {
                 return right;
             }
@@ -170,14 +182,14 @@ fn eval_expression(node: &mut Expressions, env: &mut Environment) -> Objects {
         Expressions::FunctionLiteral(value) => {
             let params: Vec<Identifier> = value.parameters().to_vec();
             let body = std::mem::replace(value.body_mut(), BlockStatement::empty());
-            return Objects::Function(Function::new(params, body, env.clone()));
+            return Objects::Function(Function::new(params, body, Rc::clone(&env)));
         }
         Expressions::CallExpression(value) => {
-            let mut func = eval_expression(&mut value.function_mut(), env);
+            let mut func = eval_expression(&mut value.function_mut(), Rc::clone(&env));
             if func.is_err() {
                 return func;
             }
-            let mut arguments = eval_expressions(&mut value.arguments_mut(), env);
+            let mut arguments = eval_expressions(&mut value.arguments_mut(), Rc::clone(&env));
             if arguments.len() == 1 && arguments[0].is_err() {
                 return arguments.remove(0);
             }
@@ -204,31 +216,35 @@ fn apply_function(func: &mut Objects, arguments: &mut Vec<Objects>) -> Objects {
                     "Invalid number of arguments to function".into(),
                 ));
             }
-            let mut extended_env = extended_env.unwrap();
-            let evaluated = eval_block_statement(&mut func.body_mut(), &mut extended_env);
+            let extended_env = extended_env.unwrap();
+            let evaluated = eval_block_statement(&mut func.body_mut(), extended_env);
             return evaluated.expect("Expected an Objects value but evaluated to None");
         }
-        _ => {
-            Objects::Error(ErrorObject::new(
-                format!("not a function: {}", func.obj_type()).into(),
-            ))
-        }
+        _ => Objects::Error(ErrorObject::new(
+            format!("not a function: {}", func.obj_type()).into(),
+        )),
     }
 }
 
-fn extend_function_env(func: &Function, args: &mut Vec<Objects>) -> Option<Environment> {
-    let mut extended_env = Environment::new_enclosed_environment(func.environment().clone());
+fn extend_function_env(
+    func: &Function,
+    args: &mut Vec<Objects>,
+) -> Option<Rc<RefCell<Environment>>> {
+    let mut extended_env = Environment::new_enclosed_environment(Rc::clone(&func.environment()));
     for (_, p) in func.parameters().iter().enumerate() {
         let next = args.remove(0);
         extended_env.set(p.value().into(), next);
     }
-    Some(extended_env)
+    Some(Rc::new(RefCell::new(extended_env)))
 }
 
-fn eval_expressions(expressions: &mut [Expressions], env: &mut Environment) -> Vec<Objects> {
+fn eval_expressions(
+    expressions: &mut [Expressions],
+    env: Rc<RefCell<Environment>>,
+) -> Vec<Objects> {
     let mut v = Vec::new();
     for ex in expressions.iter_mut() {
-        let evaluated = eval_expression(ex, env);
+        let evaluated = eval_expression(ex, Rc::clone(&env));
         if evaluated.is_err() {
             return [evaluated].to_vec();
         }
@@ -337,15 +353,15 @@ fn eval_integer_infix_expression(operator: &str, left: &Integer, right: &Integer
     }
 }
 
-fn eval_if_expression(exp: &mut IfExpression, env: &mut Environment) -> Option<Objects> {
-    let condition = eval_expression(&mut exp.condition_mut(), env);
+fn eval_if_expression(exp: &mut IfExpression, env: Rc<RefCell<Environment>>) -> Option<Objects> {
+    let condition = eval_expression(&mut exp.condition_mut(), Rc::clone(&env));
     if condition.is_err() {
         return Some(condition);
     }
     if is_truthy(&condition) {
-        return eval_block_statement(&mut exp.consequence_mut(), env);
+        return eval_block_statement(&mut exp.consequence_mut(), Rc::clone(&env));
     } else if exp.alternative().is_some() {
-        return eval_block_statement(&mut exp.alternative_mut().unwrap(), env);
+        return eval_block_statement(&mut exp.alternative_mut().unwrap(), Rc::clone(&env));
     } else {
         return Some(Objects::Null(NULL));
     }
@@ -364,7 +380,7 @@ fn is_truthy(obj: &Objects) -> bool {
     }
 }
 
-pub fn eval_program(node: &mut Program, env: &mut Environment) -> Option<Objects> {
+pub fn eval_program(node: &mut Program, env: Rc<RefCell<Environment>>) -> Option<Objects> {
     eval_statements(&mut node.statements, env)
 }
 
@@ -382,8 +398,8 @@ mod test {
         let l = Lexer::new(input.into());
         let mut p = Parser::new(l);
         let mut program = p.parse_program().expect("Program did not parse properly");
-        let mut env = Environment::new();
-        eval_program(&mut program, &mut env)
+        let env = Rc::new(RefCell::new(Environment::new()));
+        eval_program(&mut program, env)
     }
 
     fn test_int(obj: &Objects, exp: &isize) {
@@ -743,9 +759,7 @@ mod test {
         for (input, exp) in inputs {
             match test_eval(input) {
                 Some(ev) => match exp {
-                    Types::Integer(x) => {
-                        test_int(&ev, &x)
-                    }
+                    Types::Integer(x) => test_int(&ev, &x),
                     Types::String(x) => {
                         if !ev.is_err() {
                             panic!("Expected error object but received: {:?}", ev);

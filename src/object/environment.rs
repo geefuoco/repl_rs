@@ -1,11 +1,13 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use super::Objects;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
     store: HashMap<String, Objects>,
-    outer: Option<Box<Environment>>,
+    outer: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
@@ -16,10 +18,17 @@ impl Environment {
         }
     }
 
-    pub fn get(&mut self, key: String) -> Option<Objects> {
+    pub fn get(&self, key: String) -> Option<Objects> {
         let mut result = self.store.get(&key).cloned();
         if result.is_none() && self.outer.is_some() {
-            result = self.outer.as_ref().unwrap().store.get(&key).cloned();
+            result = self
+                .outer
+                .as_ref()
+                .unwrap()
+                .borrow()
+                .store
+                .get(&key)
+                .cloned();
         }
         result
     }
@@ -28,11 +37,11 @@ impl Environment {
         self.store.insert(key, value);
     }
 
-    pub fn set_outer_env(&mut self, outer: Environment) {
-        self.outer = Some(Box::new(outer));
+    pub fn set_outer_env(&mut self, outer: Rc<RefCell<Environment>>) {
+        self.outer = Some(outer);
     }
 
-    pub fn new_enclosed_environment(outer: Environment) -> Environment {
+    pub fn new_enclosed_environment(outer: Rc<RefCell<Environment>>) -> Environment {
         let mut new_env = Environment::new();
         new_env.set_outer_env(outer);
         new_env
