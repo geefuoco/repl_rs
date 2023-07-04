@@ -1,6 +1,7 @@
 use std::{
     error::Error,
     fmt::{Debug, Display},
+    rc::Rc,
 };
 
 mod boolean;
@@ -14,6 +15,7 @@ mod return_object;
 mod string_object;
 pub use boolean::Boolean;
 pub use builtin_function::BuiltinWrapper;
+pub use builtin_function::BuiltinFunction;
 pub use environment::Environment;
 pub use error::Error as ErrorObject;
 pub use function::Function;
@@ -31,7 +33,7 @@ pub enum Objects {
     Error(ErrorObject),
     Function(Function),
     String(StringObject),
-    Builtin(BuiltinWrapper),
+    Builtin(Rc<BuiltinWrapper>),
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -119,7 +121,7 @@ impl Objects {
             _ => None,
         }
     }
-    pub fn as_builtin(self) -> Option<BuiltinWrapper> {
+    pub fn as_builtin(self) -> Option<Rc<BuiltinWrapper>> {
         match self {
             Objects::Builtin(x) => Some(x),
             _ => None,
@@ -128,6 +130,13 @@ impl Objects {
     pub fn is_return(&self) -> bool {
         match self {
             Objects::Return(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        match self {
+            Objects::Null(_) => true,
             _ => false,
         }
     }

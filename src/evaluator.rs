@@ -4,9 +4,9 @@ use crate::ast::Identifier;
 use crate::ast::IfExpression;
 use crate::ast::Program;
 use crate::ast::Statements;
-use crate::builtins::BuiltinFunctionNames;
-use crate::builtins::BuiltinFunctions;
 use crate::object::Boolean;
+use crate::object::BuiltinFunction;
+use crate::object::BuiltinWrapper;
 use crate::object::Environment;
 use crate::object::ErrorObject;
 use crate::object::Function;
@@ -23,7 +23,8 @@ use std::rc::Rc;
 const TRUE: Boolean = Boolean { value: true };
 const FALSE: Boolean = Boolean { value: false };
 const NULL: Null = Null {};
-const BUILTIN: BuiltinFunctions = BuiltinFunctions::new();
+
+const KEYWORDS: [&'static str; 2] = ["len", "drop"];
 
 fn bool_helper(b: bool) -> Boolean {
     if b {
@@ -34,13 +35,8 @@ fn bool_helper(b: bool) -> Boolean {
 
 fn eval_identifier(ident: &Identifier, env: Rc<RefCell<Environment>>) -> Objects {
     match ident.value() {
-        "len" => {
-            let wrapper = BUILTIN.get(BuiltinFunctionNames::Len);
-            return Objects::Builtin(wrapper.clone());
-        }
         "drop" => {
-            let wrapper = BUILTIN.get(BuiltinFunctionNames::Drop);
-            return Objects::Builtin(wrapper.clone());
+            return Objects::Builtin(Rc::new(BuiltinWrapper::new(BuiltinFunction::Drop)));
         }
         _ => {}
     }
@@ -80,6 +76,10 @@ fn eval_statement(statement: &mut Statements, env: Rc<RefCell<Environment>>) -> 
     let mut result: Option<Objects> = None;
     match statement {
         Statements::LetStatement(value) => {
+            let word = &value.name().to_string()[..];
+            if KEYWORDS.contains(&word) {
+                return Some(Objects::Error(ErrorObject::new(format!("Cannot overwrite keyword: {}", word))));
+            }
             let let_value = eval_expression(&mut value.value_mut(), Rc::clone(&env));
             if let_value.is_err() {
                 return Some(let_value);
@@ -110,39 +110,18 @@ fn eval_statements(
     env: Rc<RefCell<Environment>>,
 ) -> Option<Objects> {
     let mut result: Option<Objects> = None;
-    let mut is_err = false;
+    let mut is_returnable = false;
     for stmt in statements.iter_mut() {
-        match stmt {
-            Statements::LetStatement(value) => {
-                let let_value = eval_expression(&mut value.value_mut(), Rc::clone(&env));
-                if let_value.is_err() {
-                    println!("Error in let statement");
-                    return Some(let_value);
-                }
-                env.borrow_mut().set(value.name().value().into(), let_value);
-            }
-            Statements::ReturnStatement(value) => {
-                let return_value = eval_expression(&mut value.return_value_mut(), Rc::clone(&env));
-                let ret = Objects::Return(Return::new(return_value));
-                return Some(ret);
-            }
-            Statements::ExpressionStatement(value) => {
-                result = Some(eval_expression(
-                    &mut value.expression_mut(),
-                    Rc::clone(&env),
-                ));
-            }
-            Statements::BlockStatement(value) => {
-                result = eval_block_statement(value, Rc::clone(&env));
-            }
-            Statements::Empty => panic!("Reached an empty statement"),
-        }
+        result = eval_statement(stmt, Rc::clone(&env));
         if let Some(ref result) = result {
-            is_err = result.is_err();
+            if result.is_err() || result.is_return() {
+                is_returnable = true;
+            }
         }
-        if is_err {
+        if is_returnable {
             return result;
         }
+
     }
     result
 }
@@ -186,14 +165,51 @@ fn eval_expression(node: &mut Expressions, env: Rc<RefCell<Environment>>) -> Obj
         }
         Expressions::CallExpression(value) => {
             let mut func = eval_expression(&mut value.function_mut(), Rc::clone(&env));
-            if func.is_err() {
-                return func;
+            match func {
+                Objects::Error(_) => return func,
+                Objects::Builtin(b) => {
+                    let func = b.func();
+                    match func {
+                        BuiltinFunction::Drop => {
+                            if value.arguments().len() != 1 {
+                                return Objects::Error(ErrorObject::new(String::from(
+                                    "Invalid number of arguments to function",
+                                )));
+                            }
+                            let ident = value.arguments().get(0).unwrap();
+                            match ident {
+                                Expressions::Identifier(val) => {
+                                    env.borrow_mut().delete(val.to_string().as_str());
+                                    return Objects::Null(NULL);
+                                }
+                                _ => {
+                                    return Objects::Error(ErrorObject::new(format!(
+                                        "Expected Identifier, received: {}",
+                                        ident
+                                    )))
+                                }
+                            }
+                        }
+                        BuiltinFunction::Default(func) => {
+                            let mut arguments =
+                                eval_expressions(&mut value.arguments_mut(), Rc::clone(&env));
+                            if arguments.len() == 1 && arguments[0].is_err() {
+                                return arguments.remove(0);
+                            }
+                            let evaluated = func(&arguments);
+                            return evaluated;
+                        }
+                    }
+                }
+                _ => {
+                    let mut arguments =
+                        eval_expressions(&mut value.arguments_mut(), Rc::clone(&env));
+                    if arguments.len() == 1 && arguments[0].is_err() {
+                        return arguments.remove(0);
+                    }
+                    return apply_function(&mut func, &mut arguments);
+                }
             }
-            let mut arguments = eval_expressions(&mut value.arguments_mut(), Rc::clone(&env));
-            if arguments.len() == 1 && arguments[0].is_err() {
-                return arguments.remove(0);
-            }
-            return apply_function(&mut func, &mut arguments);
         }
         Expressions::StringLiteral(value) => {
             Objects::String(StringObject::new(value.value().into()))
@@ -202,12 +218,20 @@ fn eval_expression(node: &mut Expressions, env: Rc<RefCell<Environment>>) -> Obj
     }
 }
 
+
 fn apply_function(func: &mut Objects, arguments: &mut Vec<Objects>) -> Objects {
     match func {
         Objects::Builtin(b) => {
             let func = b.func();
-            let evaluated = func(&arguments);
-            return evaluated;
+            match func {
+                BuiltinFunction::Default(func) => {
+                    let evaluated = func(&arguments);
+                    return evaluated;
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
         }
         Objects::Function(func) => {
             let extended_env = extend_function_env(&func, arguments);
@@ -392,6 +416,7 @@ mod test {
     enum Types {
         Integer(isize),
         String(String),
+        Null,
     }
 
     fn test_eval(input: &str) -> Option<Objects> {
@@ -580,9 +605,12 @@ mod test {
             match evaluated {
                 Some(v) => match v {
                     Objects::Return(ret) => test_int(ret.value(), &i),
+                    // Objects::Integer(_) => {
+                    //     test_int(&v, &i);
+                    // }
                     _ => {
                         let exp = v.obj_type();
-                        let msg = format!("Expcted Return. Got {}", &exp);
+                        let msg = format!("Expected Return. Got {}", &exp);
                         eprintln!("{}", msg);
                         assert!(false);
                     }
@@ -754,6 +782,24 @@ mod test {
                 r#"len("one", "two")"#,
                 Types::String("expected 1 argument but received 2".into()),
             ),
+            (r#"let x = 5; drop(x)"#, Types::Null),
+            (
+                r#"let x = 5; drop(x); x"#,
+                Types::String("identifier not found: x".into()),
+            ),
+            (
+                r#"let x = 5; drop(5)"#,
+                Types::String("Expected Identifier, received: 5".into()),
+            ),
+            (
+                r#"let drop = 5;"#,
+                Types::String("Cannot overwrite keyword: drop".into()),
+            ),
+            (
+                r#"let len = fn(x) { 5 };"#,
+                Types::String("Cannot overwrite keyword: len".into()),
+            ),
+
         ];
 
         for (input, exp) in inputs {
@@ -767,6 +813,7 @@ mod test {
                         let err = ev.as_err().unwrap();
                         assert_eq!(x, err.message());
                     }
+                    Types::Null => assert!(ev.is_null()),
                 },
                 None => assert!(false, "No output"),
             }

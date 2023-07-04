@@ -1,6 +1,11 @@
 use super::{Object, ObjectTypes, Objects};
 
-type BuiltinFunction = fn(args: &[Objects]) -> Objects;
+// type BuiltinFunction = fn(args: &[Objects]) -> Objects;
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum BuiltinFunction {
+    Default(fn(args: &[Objects]) -> Objects),
+    Drop,
+}
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct BuiltinWrapper {
